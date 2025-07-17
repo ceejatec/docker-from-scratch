@@ -1,4 +1,4 @@
-FROM debian:11
+FROM debian:11 as lfs-build
 
 # The section headers here are from "Linux From Scratch, version 12.3"
 # https://www.linuxfromscratch.org/lfs/view/12.3/
@@ -188,3 +188,36 @@ RUN /lfs-scripts/6.17-binutils-pass2.sh
 # 6.18 GCC - pass 2
 COPY scripts/6.18-gcc-pass2.sh /lfs-scripts/6.18-gcc-pass2.sh
 RUN /lfs-scripts/6.18-gcc-pass2.sh
+
+# 6.xx - Add httpie so the image has a way to download files with
+# needing to install openssl (which requires installing perl....)
+ARG HTTPIE_VERSION=3.4.0
+ARG ZLIB_VERSION=1.3.1
+COPY scripts/6.xx-httpie.sh /lfs-scripts/6.xx-httpie.sh
+RUN /lfs-scripts/6.xx-httpie.sh
+
+# 7.2 Clean up LFS - remove the cross toolchain and chown everything
+# back to root. Also create /tmp.
+USER root
+RUN set -x \
+    && rm -rf ${LFS}/tools \
+    && mkdir -p ${LFS}/tmp \
+    && chmod 1777 ${LFS}/tmp \
+    && chown -R root:root ${LFS}
+
+FROM scratch as lfs-chroot
+COPY --from=lfs-build /mnt/lfs /
+
+# 8.42 Less
+ARG LESS_VERSION=668
+COPY scripts/8.42-less.sh /lfs-scripts/8.42-less.sh
+RUN /lfs-scripts/8.42-less.sh
+
+# 8.84 Strip LFS binaries, inside chroot jail
+COPY scripts/8.84-stripping.sh /lfs-scripts/8.84-stripping.sh
+RUN /lfs-scripts/8.84-stripping.sh
+
+RUN rm -rf /lfs-scripts
+
+FROM scratch as lfs-final
+COPY --from=lfs-chroot / /
