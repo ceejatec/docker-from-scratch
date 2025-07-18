@@ -95,7 +95,7 @@ RUN /lfs-scripts/5.2-binutils-pass1.sh
 
 # 5.3 GCC - pass 1
 ARG GLIBC_VERSION=2.28
-ARG GCC_VERSION=14.2.0
+ARG GCC_VERSION=13.2.0
 ARG MPFR_VERSION=4.2.1
 ARG GMP_VERSION=6.3.0
 ARG MPC_VERSION=1.3.1
@@ -116,8 +116,8 @@ RUN /lfs-scripts/5.4-linux-api-headers.sh
 
 # 5.5 Glibc - this (and only this) is installed globally on the LFS filesystem.
 ARG GLIBC_VERSION=2.28
-COPY scripts/5.5-glibc.sh /lfs-scripts/5.5-glibc.sh
-RUN /lfs-scripts/5.5-glibc.sh
+COPY scripts/5.5-glibc-pass1.sh /lfs-scripts/5.5-glibc-pass1.sh
+RUN /lfs-scripts/5.5-glibc-pass1.sh
 
 # 5.6 Libstdc++
 COPY scripts/5.6-libstdc++.sh /lfs-scripts/5.6-libstdc++.sh
@@ -241,19 +241,84 @@ RUN ln -sf /pass2/bin/bash ${LFS}/bin/sh
 FROM scratch AS lfs-chroot
 COPY --from=lfs-build /mnt/lfs /
 
-# 8.29 GCC - pass 3
-ARG GLIBC_VERSION=2.28
-ARG GCC_VERSION=14.2.0
-ARG MPFR_VERSION=4.2.1
-ARG GMP_VERSION=6.3.0
-ARG MPC_VERSION=1.3.1
-ARG GNU_MIRROR=https://mirrors.ocf.berkeley.edu/gnu
+#
+# PASS 3 - "chroot" by restarting the build from the current LFS image,
+# and rebuild everything into /usr.
+#
 
 # Now we want the /pass2 tools on the PATH, but put them last so that
 # we'll prefer to use the ones we're about to re-build.
 ENV PATH=/bin:/usr/bin:/pass2/bin
 ENV LFS_TGT=x86_64-lfs-linux-gnu
 ARG PARALLELISM=8
+
+# 8.5 glibc - pass 3
+ARG GLIBC_VERSION=2.28
+COPY scripts/8.5-glibc-pass3.sh /lfs-scripts/8.5-glibc-pass3.sh
+RUN /lfs-scripts/8.5-glibc-pass3.sh
+
+# 8.6 zlib
+ARG ZLIB_VERSION=1.3.1
+COPY scripts/8.6-zlib.sh /lfs-scripts/8.6-zlib.sh
+RUN /lfs-scripts/8.6-zlib.sh
+
+# 8.7 bzip2
+ARG BZIP2_VERSION=1.0.8
+COPY scripts/8.7-bzip2.sh /lfs-scripts/8.7-bzip2.sh
+RUN /lfs-scripts/8.7-bzip2.sh
+
+# 8.8 XZ
+ARG XZ_VERSION=5.6.4
+COPY scripts/8.8-xz.sh /lfs-scripts/8.8-xz.sh
+RUN /lfs-scripts/8.8-xz.sh
+
+# 8.9 LZ4
+ARG LZ4_VERSION=1.10.4
+COPY scripts/8.9-lz4.sh /lfs-scripts/8.9-lz4.sh
+RUN /lfs-scripts/8.9-lz4.sh
+
+# 8.10 zstd
+ARG ZSTD_VERSION=1.5.7
+COPY scripts/8.10-zstd.sh /lfs-scripts/8.10-zstd.sh
+RUN /lfs-scripts/8.10-zstd.sh
+
+# 8.11 File
+ARG FILE_VERSION=5.46
+COPY scripts/8.11-file.sh /lfs-scripts/8.11-file.sh
+RUN /lfs-scripts/8.11-file.sh
+
+# 8.12 readline
+ARG READLINE_VERSION=8.2.13
+COPY scripts/8.12-readline.sh /lfs-scripts/8.12-readline.sh
+RUN /lfs-scripts/8.12-readline.sh
+
+# 8.13 M4
+ARG M4_VERSION=1.4.19
+COPY scripts/8.13-m4.sh /lfs-scripts/8.13-m4.sh
+RUN /lfs-scripts/8.13-m4.sh
+
+# 8.15 flex
+ARG FLEX_VERSION=2.6.4
+COPY scripts/8.15-flex.sh /lfs-scripts/8.15-flex.sh
+RUN /lfs-scripts/8.15-flex.sh
+
+# 8.19 pkgconf
+ARG PKGCONF_VERSION=2.3.0
+COPY scripts/8.19-pkgconf.sh /lfs-scripts/8.19-pkgconf.sh
+RUN /lfs-scripts/8.19-pkgconf.sh
+
+# 8.29 GCC - pass 3
+ARG GCC_VERSION=13.2.0
+ARG MPFR_VERSION=4.2.1
+ARG GMP_VERSION=6.3.0
+ARG MPC_VERSION=1.3.1
+ARG GNU_MIRROR=https://mirrors.ocf.berkeley.edu/gnu
+
+# 8.30 Ncurses
+ARG NCURSES_VERSION=6.5
+COPY scripts/8.30-ncurses.sh /lfs-scripts/8.30-ncurses.sh
+RUN /lfs-scripts/8.30-ncurses.sh
+
 
 COPY scripts/8.29-gcc-pass3.sh /lfs-scripts/8.29-gcc-pass3.sh
 RUN /lfs-scripts/8.29-gcc-pass3.sh

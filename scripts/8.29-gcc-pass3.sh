@@ -24,7 +24,7 @@ esac
 
 mkdir build
 cd build
-../configure --prefix=/usr            \
+../configure --prefix=/opt/gcc-${GCC_VERSION} \
              LD=ld                    \
              --enable-languages=c,c++ \
              --enable-default-pie     \
@@ -38,7 +38,7 @@ cd build
 make -j${PARALLELISM}
 make install
 
-ln -sv gcc /usr/bin/cc
+ln -sv gcc /opt/gcc-${GCC_VERSION}/bin/cc
 
 cd /tmp
 rm -rf gcc-${GCC_VERSION} gcc-${GCC_VERSION}.tar.xz
