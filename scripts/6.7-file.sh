@@ -16,12 +16,12 @@ make -j${PARALLELISM}
 popd
 
 # Build and install the real package
-./configure --prefix=/usr --host=$LFS_TGT --build=$(./config.guess)
+./configure --prefix=/pass2 --host=$LFS_TGT --build=$(./config.guess)
 make -j${PARALLELISM} FILE_COMPILE=$(pwd)/build/src/file
 make DESTDIR=$LFS install
 
 # Clean an unwanted file
-rm -v $LFS/usr/lib/libmagic.la
+rm -v $LFS/pass2/lib/libmagic.la
 
 cd $LFS_SRC
 rm -rf file-${FILE_VERSION} file-${FILE_VERSION}.tar.gz

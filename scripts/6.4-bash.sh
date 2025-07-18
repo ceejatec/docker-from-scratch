@@ -4,7 +4,7 @@ cd $LFS_SRC
 curl -LO ${GNU_MIRROR}/bash/bash-${BASH_SHELL_VERSION}.tar.gz
 tar -xf bash-${BASH_SHELL_VERSION}.tar.gz
 cd bash-${BASH_SHELL_VERSION}
-./configure --prefix=/usr                      \
+./configure --prefix=/pass2                    \
             --build=$(sh support/config.guess) \
             --host=$LFS_TGT                    \
             --without-bash-malloc

@@ -4,7 +4,7 @@ cd $LFS_SRC
 curl -LO ${GNU_MIRROR}/tar/tar-${TAR_VERSION}.tar.xz
 tar -xf tar-${TAR_VERSION}.tar.xz
 cd tar-${TAR_VERSION}
-./configure --prefix=/usr                     \
+./configure --prefix=/pass2                   \
             --host=$LFS_TGT                   \
             --build=$(build-aux/config.guess)
 make -j${PARALLELISM}

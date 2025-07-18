@@ -5,7 +5,7 @@ curl -LO ${GNU_MIRROR}/make/make-${MAKE_VERSION}.tar.gz
 tar -xf make-${MAKE_VERSION}.tar.gz
 cd make-${MAKE_VERSION}
 
-./configure --prefix=/usr   \
+./configure --prefix=/pass2 \
             --without-guile \
             --host=$LFS_TGT \
             --build=$(build-aux/config.guess)

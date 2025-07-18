@@ -32,7 +32,7 @@ sed '/RTLDLIST=/s@/usr@@g' -i $LFS/usr/bin/ldd
 cd $LFS_SRC
 rm -rf glibc-${GLIBC_VERSION} glibc-${GLIBC_VERSION}.tar.xz
 
-# Simple test
+# Basic test
 cd /tmp
 echo 'int main(){}' | $LFS_TGT-gcc -xc -
 readelf -l a.out | grep ld-linux

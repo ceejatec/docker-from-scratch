@@ -1,4 +1,4 @@
-FROM debian:11 as lfs-build
+FROM debian:11 AS lfs-build
 
 # The section headers here are from "Linux From Scratch, version 12.3"
 # https://www.linuxfromscratch.org/lfs/view/12.3/
@@ -45,12 +45,12 @@ RUN /lfs-scripts/2.2.2-host-requirements.sh | grep ERROR: ; \
     fi
 
 # 2.6 Create LFS installation directory
+# Note: we store build stuff in /mnt/sources, outside the LFS tree -
+# this is a change compared to the LFS book.
 ENV LFS=/mnt/lfs
 ENV LFS_SRC=/mnt/sources
 
 # 4.2 Create limited directory layout in LFS filesystem.
-# Note: we store build stuff in /mnt/sources, outside the LFS tree -
-# this is a change compared to the LFS book.
 COPY scripts/4.2-create-directory-layout.sh /lfs-scripts/4.2-create-directory-layout.sh
 RUN /lfs-scripts/4.2-create-directory-layout.sh
 
@@ -60,12 +60,12 @@ RUN set -x \
     && useradd -s /bin/bash -g lfs -m -k /dev/null -u 1000 lfs \
     && chown -R lfs:lfs $LFS $LFS_SRC
 
-# 4.4 Set up the LFS environment
+# 4.4 Set up the environment for building LFS.
 ARG TARGETARCH
 ENV LC_ALL=POSIX
 # QQQ!
 ENV LFS_TGT=x86_64-lfs-linux-gnu
-ENV PATH=/bin:/usr/bin:${LFS}/tools/bin
+ENV PATH=${LFS}/pass1/bin:/bin:/usr/bin
 ENV CONFIG_SITE=${LFS_SRC}/usr/share/config.site
 RUN rm /etc/bash.bashrc
 
@@ -73,10 +73,22 @@ USER lfs
 
 ARG PARALLELISM=8
 
+#
+# The goal here is to create a minimal working environment - with a
+# glibc version of our choosing - that we can chroot into and build gcc
+# from source. This requires quite some shenanigans.
+#
+# PASS 1 - build a cross toolchain in this Debian environment, with
+# locally-built binutils and gcc. These are installed into the nascent
+# LFS image under /pass1. It would be preferable to build them entirely
+# outside the LFS filesystem, but the that eventually fails when trying
+# to build libstdc++.
+#
+
 # 5.2 Binutils - pass 1
 
-# NOTE: upgrading binutils will require tweaking the patch in the later
-# script 6.17-binutils-pass2.sh.
+# NOTE: picking binutils != 2.44 will require tweaking the patch in the
+# later script 6.17-binutils-pass2.sh.
 ARG BINUTILS_VERSION=2.44
 COPY scripts/5.2-binutils-pass1.sh /lfs-scripts/5.2-binutils-pass1.sh
 RUN /lfs-scripts/5.2-binutils-pass1.sh
@@ -91,12 +103,18 @@ ARG GNU_MIRROR=https://mirrors.ocf.berkeley.edu/gnu
 COPY scripts/5.3-gcc-pass1.sh /lfs-scripts/5.3-gcc-pass1.sh
 RUN /lfs-scripts/5.3-gcc-pass1.sh
 
+#
+# Build minimal libraries into /usr on the LFS filesystem: the kernel
+# headers, glibc (the whole reason we're doing this dance), libstdc++,
+# ncurses, and zlib. These will be rebuilt and overwritten later.
+#
+
 # 5.4 Linux API Headers
 ARG LINUX_VERSION=6.13.4
 COPY scripts/5.4-linux-api-headers.sh /lfs-scripts/5.4-linux-api-headers.sh
 RUN /lfs-scripts/5.4-linux-api-headers.sh
 
-# # 5.5 Glibc
+# 5.5 Glibc - this (and only this) is installed globally on the LFS filesystem.
 ARG GLIBC_VERSION=2.28
 COPY scripts/5.5-glibc.sh /lfs-scripts/5.5-glibc.sh
 RUN /lfs-scripts/5.5-glibc.sh
@@ -105,17 +123,32 @@ RUN /lfs-scripts/5.5-glibc.sh
 COPY scripts/5.6-libstdc++.sh /lfs-scripts/5.6-libstdc++.sh
 RUN /lfs-scripts/5.6-libstdc++.sh
 
+# 5.xx Zlib - required to run httpie later (not part of LFS)
+ARG ZLIB_VERSION=1.3.1
+COPY scripts/5.xx-zlib.sh /lfs-scripts/5.xx-zlib.sh
+RUN /lfs-scripts/5.xx-zlib.sh
+
+#
+# PASS 2 - Using the cross toolchain we built in pass 1, build various
+# tools into /pass2 in the LFS filesystem, culminating with the second
+# build of gcc. These tools will be used to build the final LFS system
+# in the chroot jail.
+#
+
+# We actually don't want these pass2 tools on the PATH yet, since they
+# may not be compatible with the libraries in this Debian environment.
+
 # 6.2 M4
 ARG M4_VERSION=1.4.19
 COPY scripts/6.2-m4.sh /lfs-scripts/6.2-m4.sh
 RUN /lfs-scripts/6.2-m4.sh
 
-# 6.3 Ncurses
+# 6.3 Ncurses - required to build bash
 ARG NCURSES_VERSION=6.5
 COPY scripts/6.3-ncurses.sh /lfs-scripts/6.3-ncurses.sh
 RUN /lfs-scripts/6.3-ncurses.sh
 
-# 6.4 Bash
+# 6.4 Bash - required to build GCC
 # Use BASH_SHELL_VERSION since BASH_VERSION is a built-in variable in bash
 ARG BASH_SHELL_VERSION=5.2.37
 COPY scripts/6.4-bash.sh /lfs-scripts/6.4-bash.sh
@@ -189,35 +222,52 @@ RUN /lfs-scripts/6.17-binutils-pass2.sh
 COPY scripts/6.18-gcc-pass2.sh /lfs-scripts/6.18-gcc-pass2.sh
 RUN /lfs-scripts/6.18-gcc-pass2.sh
 
-# 6.xx - Add httpie so the image has a way to download files with
+# 6.xx - Add httpie so the image has a way to download files without
 # needing to install openssl (which requires installing perl....)
 ARG HTTPIE_VERSION=3.4.0
 ARG ZLIB_VERSION=1.3.1
 COPY scripts/6.xx-httpie.sh /lfs-scripts/6.xx-httpie.sh
 RUN /lfs-scripts/6.xx-httpie.sh
 
-# 7.2 Clean up LFS - remove the cross toolchain and chown everything
-# back to root. Also create /tmp.
+# 7.2 Clean up LFS - chown everything back to root, and delete /pass1.
+# Also create /tmp.
 USER root
 RUN set -x \
-    && rm -rf ${LFS}/tools \
     && mkdir -p ${LFS}/tmp \
     && chmod 1777 ${LFS}/tmp \
     && chown -R root:root ${LFS}
+RUN ln -sf /pass2/bin/bash ${LFS}/bin/sh
 
-FROM scratch as lfs-chroot
+FROM scratch AS lfs-chroot
 COPY --from=lfs-build /mnt/lfs /
 
-# 8.42 Less
-ARG LESS_VERSION=668
-COPY scripts/8.42-less.sh /lfs-scripts/8.42-less.sh
-RUN /lfs-scripts/8.42-less.sh
+# 8.29 GCC - pass 3
+ARG GLIBC_VERSION=2.28
+ARG GCC_VERSION=14.2.0
+ARG MPFR_VERSION=4.2.1
+ARG GMP_VERSION=6.3.0
+ARG MPC_VERSION=1.3.1
+ARG GNU_MIRROR=https://mirrors.ocf.berkeley.edu/gnu
 
-# 8.84 Strip LFS binaries, inside chroot jail
-COPY scripts/8.84-stripping.sh /lfs-scripts/8.84-stripping.sh
-RUN /lfs-scripts/8.84-stripping.sh
+# Now we want the /pass2 tools on the PATH, but put them last so that
+# we'll prefer to use the ones we're about to re-build.
+ENV PATH=/bin:/usr/bin:/pass2/bin
+ENV LFS_TGT=x86_64-lfs-linux-gnu
+ARG PARALLELISM=8
 
-RUN rm -rf /lfs-scripts
+COPY scripts/8.29-gcc-pass3.sh /lfs-scripts/8.29-gcc-pass3.sh
+RUN /lfs-scripts/8.29-gcc-pass3.sh
 
-FROM scratch as lfs-final
-COPY --from=lfs-chroot / /
+# # 8.42 Less
+# ARG LESS_VERSION=668
+# COPY scripts/8.42-less.sh /lfs-scripts/8.42-less.sh
+# RUN /lfs-scripts/8.42-less.sh
+
+# # 8.84 Strip LFS binaries, inside chroot jail
+# COPY scripts/8.84-stripping.sh /lfs-scripts/8.84-stripping.sh
+# RUN /lfs-scripts/8.84-stripping.sh
+
+# RUN rm -rf /lfs-scripts
+
+# FROM scratch AS lfs-final
+# COPY --from=lfs-chroot / /

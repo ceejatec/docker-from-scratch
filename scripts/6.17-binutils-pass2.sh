@@ -14,7 +14,7 @@ sed '6031s/$add_dir//' -i ltmain.sh
 mkdir build
 cd build
 ../configure                   \
-    --prefix=/usr              \
+    --prefix=/pass2            \
     --build=$(../config.guess) \
     --host=$LFS_TGT            \
     --disable-nls              \
@@ -27,7 +27,7 @@ cd build
 make -j${PARALLELISM}
 make DESTDIR=$LFS install
 
-rm -v $LFS/usr/lib/lib{bfd,ctf,ctf-nobfd,opcodes,sframe}.{a,la}
+rm -v $LFS/pass2/lib/lib{bfd,ctf,ctf-nobfd,opcodes,sframe}.{a,la}
 
 cd $LFS_SRC
 rm -rf binutils-${BINUTILS_VERSION} binutils-${BINUTILS_VERSION}.tar.xz

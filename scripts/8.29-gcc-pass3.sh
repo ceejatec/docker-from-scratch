@@ -1,17 +1,17 @@
-#!/bin/bash -ex
+#!/pass2/bin/bash -ex
 
 # Download all source
-cd $LFS_SRC
-curl -LO ${GNU_MIRROR}/gcc/gcc-${GCC_VERSION}/gcc-${GCC_VERSION}.tar.xz
+cd /tmp
+http --download GET ${GNU_MIRROR}/gcc/gcc-${GCC_VERSION}/gcc-${GCC_VERSION}.tar.xz -o gcc-${GCC_VERSION}.tar.xz
 tar -xf gcc-${GCC_VERSION}.tar.xz
 cd gcc-${GCC_VERSION}
-curl -LO ${GNU_MIRROR}/gmp/gmp-${GMP_VERSION}.tar.xz
+http --download GET ${GNU_MIRROR}/gmp/gmp-${GMP_VERSION}.tar.xz -o gmp-${GMP_VERSION}.tar.xz
 tar -xf gmp-${GMP_VERSION}.tar.xz
 mv gmp-${GMP_VERSION} gmp
-curl -LO ${GNU_MIRROR}/mpfr/mpfr-${MPFR_VERSION}.tar.xz
+http --download GET ${GNU_MIRROR}/mpfr/mpfr-${MPFR_VERSION}.tar.xz -o mpfr-${MPFR_VERSION}.tar.xz
 tar -xf mpfr-${MPFR_VERSION}.tar.xz
 mv mpfr-${MPFR_VERSION} mpfr
-curl -LO ${GNU_MIRROR}/mpc/mpc-${MPC_VERSION}.tar.gz
+http --download GET ${GNU_MIRROR}/mpc/mpc-${MPC_VERSION}.tar.gz -o mpc-${MPC_VERSION}.tar.gz
 tar -xf mpc-${MPC_VERSION}.tar.gz
 mv mpc-${MPC_VERSION} mpc
 
@@ -22,34 +22,23 @@ case $(uname -m) in
         ;;
 esac
 
-# Allow building libgcc and libstdc++ with POSIX threads
-sed '/thread_header =/s/@.*@/gthr-posix.h/' \
-    -i libgcc/Makefile.in libstdc++-v3/include/Makefile.in
-
 mkdir build
 cd build
-../configure                                       \
-    --build=$(../config.guess)                     \
-    --host=$LFS_TGT                                \
-    --target=$LFS_TGT                              \
-    LDFLAGS_FOR_TARGET=-L$PWD/$LFS_TGT/libgcc      \
-    --prefix=/usr                                  \
-    --with-build-sysroot=$LFS                      \
-    --enable-default-pie                           \
-    --enable-default-ssp                           \
-    --disable-nls                                  \
-    --disable-multilib                             \
-    --disable-libatomic                            \
-    --disable-libgomp                              \
-    --disable-libquadmath                          \
-    --disable-libsanitizer                         \
-    --disable-libssp                               \
-    --disable-libvtv                               \
-    --enable-languages=c,c++
+../configure --prefix=/usr            \
+             LD=ld                    \
+             --enable-languages=c,c++ \
+             --enable-default-pie     \
+             --enable-default-ssp     \
+             --enable-host-pie        \
+             --disable-multilib       \
+             --disable-bootstrap      \
+             --disable-fixincludes    \
+             --with-system-zlib
+
 make -j${PARALLELISM}
-make DESTDIR=$LFS install
+make install
 
-ln -sv gcc $LFS/usr/bin/cc
+ln -sv gcc /usr/bin/cc
 
-cd $LFS_SRC
+cd /tmp
 rm -rf gcc-${GCC_VERSION} gcc-${GCC_VERSION}.tar.xz

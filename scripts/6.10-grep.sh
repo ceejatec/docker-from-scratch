@@ -5,7 +5,7 @@ curl -LO ${GNU_MIRROR}/grep/grep-${GREP_VERSION}.tar.xz
 tar -xf grep-${GREP_VERSION}.tar.xz
 cd grep-${GREP_VERSION}
 
-./configure --prefix=/usr   \
+./configure --prefix=/pass2 \
             --host=$LFS_TGT \
             --build=$(./build-aux/config.guess)
 make -j${PARALLELISM}

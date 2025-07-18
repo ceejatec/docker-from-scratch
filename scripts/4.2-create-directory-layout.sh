@@ -1,6 +1,6 @@
 #!/bin/bash -e
 
-mkdir -pv $LFS/{etc,var,tools} $LFS/usr/{bin,lib,sbin}
+mkdir -pv $LFS/{etc,var,pass1,pass2} $LFS/usr/{bin,lib,sbin}
 for i in bin lib sbin; do
     ln -sv usr/$i $LFS/$i
 done

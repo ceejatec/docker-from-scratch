@@ -6,7 +6,7 @@ tar -xf binutils-${BINUTILS_VERSION}.tar.xz
 cd binutils-${BINUTILS_VERSION}
 mkdir build
 cd build
-../configure --prefix=$LFS/tools \
+../configure --prefix=$LFS/pass1 \
   --with-sysroot=$LFS \
   --target=$LFS_TGT \
   --disable-nls \

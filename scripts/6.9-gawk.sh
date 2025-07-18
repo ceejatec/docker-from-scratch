@@ -7,7 +7,7 @@ cd gawk-${GAWK_VERSION}
 
 sed -i 's/extras//' Makefile.in
 
-./configure --prefix=/usr   \
+./configure --prefix=/pass2 \
             --host=$LFS_TGT \
             --build=$(build-aux/config.guess)
 make -j${PARALLELISM}

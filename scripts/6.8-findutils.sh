@@ -4,7 +4,7 @@ cd $LFS_SRC
 curl -LO ${GNU_MIRROR}/findutils/findutils-${FINDUTILS_VERSION}.tar.xz
 tar -xf findutils-${FINDUTILS_VERSION}.tar.xz
 cd findutils-${FINDUTILS_VERSION}
-./configure --prefix=/usr                   \
+./configure --prefix=/pass2                 \
             --localstatedir=/var/lib/locate \
             --host=$LFS_TGT                 \
             --build=$(build-aux/config.guess)

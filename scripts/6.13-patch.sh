@@ -5,7 +5,7 @@ curl -LO ${GNU_MIRROR}/patch/patch-${PATCH_VERSION}.tar.gz
 tar -xf patch-${PATCH_VERSION}.tar.gz
 cd patch-${PATCH_VERSION}
 
-./configure --prefix=/usr   \
+./configure --prefix=/pass2 \
             --host=$LFS_TGT \
             --build=$(build-aux/config.guess)
 make -j${PARALLELISM}

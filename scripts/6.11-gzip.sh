@@ -5,7 +5,7 @@ curl -LO ${GNU_MIRROR}/gzip/gzip-${GZIP_VERSION}.tar.xz
 tar -xf gzip-${GZIP_VERSION}.tar.xz
 cd gzip-${GZIP_VERSION}
 
-./configure --prefix=/usr --host=$LFS_TGT
+./configure --prefix=/pass2 --host=$LFS_TGT
 make -j${PARALLELISM}
 make DESTDIR=$LFS install
 

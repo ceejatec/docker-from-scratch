@@ -33,7 +33,7 @@ cd build
     --host=$LFS_TGT                                \
     --target=$LFS_TGT                              \
     LDFLAGS_FOR_TARGET=-L$PWD/$LFS_TGT/libgcc      \
-    --prefix=/usr                                  \
+    --prefix=/pass2                                \
     --with-build-sysroot=$LFS                      \
     --enable-default-pie                           \
     --enable-default-ssp                           \
@@ -49,7 +49,7 @@ cd build
 make -j${PARALLELISM}
 make DESTDIR=$LFS install
 
-ln -sv gcc $LFS/usr/bin/cc
+ln -sv gcc $LFS/pass2/bin/cc
 
 cd $LFS_SRC
 rm -rf gcc-${GCC_VERSION} gcc-${GCC_VERSION}.tar.xz

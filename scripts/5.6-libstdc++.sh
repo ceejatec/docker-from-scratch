@@ -14,7 +14,7 @@ cd build
   --disable-multilib              \
   --disable-nls                   \
   --disable-libstdcxx-pch         \
-  --with-gxx-include-dir=/tools/$LFS_TGT/include/c++/${GCC_VERSION}
+  --with-gxx-include-dir=/pass1/$LFS_TGT/include/c++/${GCC_VERSION}
 make -j${PARALLELISM}
 make DESTDIR=$LFS install
 rm -v $LFS/usr/lib/lib{stdc++{,exp,fs},supc++}.la

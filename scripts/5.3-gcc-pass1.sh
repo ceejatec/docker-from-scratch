@@ -26,7 +26,7 @@ mkdir build
 cd build
 ../configure                \
   --target=$LFS_TGT         \
-  --prefix=$LFS/tools   \
+  --prefix=$LFS/pass1       \
   --with-glibc-version=${GLIBC_VERSION} \
   --with-sysroot=$LFS       \
   --with-newlib             \
