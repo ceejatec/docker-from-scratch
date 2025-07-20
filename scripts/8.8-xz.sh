@@ -1,7 +1,7 @@
-#!/bin/bash -ex
+#!/pass2/bin/bash -ex
 
-cd /tmp
-curl -LO https://github.com/tukaani-project/xz/releases/download/v${XZ_VERSION}/xz-${XZ_VERSION}.tar.xz
+cd /sources
+download https://github.com/tukaani-project/xz/releases/download/v${XZ_VERSION}/xz-${XZ_VERSION}.tar.xz
 tar -xf xz-${XZ_VERSION}.tar.xz
 cd xz-${XZ_VERSION}
 
@@ -11,5 +11,5 @@ cd xz-${XZ_VERSION}
 make -j${PARALLELISM}
 make install
 
-cd /tmp
+cd /sources
 rm -rf xz-${XZ_VERSION} xz-${XZ_VERSION}.tar.xz

@@ -1,6 +1,6 @@
-#!/bin/bash -ex
+#!/pass2/bin/bash -ex
 
-cd /tmp
+cd /sources
 https --download https://www.greenwoodsoftware.com/less/less-${LESS_VERSION}.tar.gz -o less-${LESS_VERSION}.tar.gz
 tar -xf less-${LESS_VERSION}.tar.gz
 cd less-${LESS_VERSION}
@@ -8,5 +8,5 @@ cd less-${LESS_VERSION}
 make -j${PARALLELISM}
 make install
 
-cd /tmp
+cd /sources
 rm -rf less-${LESS_VERSION} less-${LESS_VERSION}.tar.gz

@@ -1,7 +1,8 @@
-#!/bin/bash -ex
+#!/pass2/bin/bash -ex
 
-cd /tmp
-curl -LO https://astron.com/pub/file/file-${FILE_VERSION}.tar.gz
+cd /sources
+env
+download https://astron.com/pub/file/file-${FILE_VERSION}.tar.gz
 tar -xf file-${FILE_VERSION}.tar.gz
 cd file-${FILE_VERSION}
 
@@ -10,5 +11,5 @@ cd file-${FILE_VERSION}
 make -j${PARALLELISM}
 make install
 
-cd /tmp
+cd /sources
 rm -rf file-${FILE_VERSION} file-${FILE_VERSION}.tar.gz

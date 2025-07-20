@@ -1,7 +1,7 @@
-#!/bin/bash -ex
+#!/pass2/bin/bash -ex
 
-cd /tmp
-curl -LO ${GNU_MIRROR}/ncurses/ncurses-${NCURSES_VERSION}.tar.gz
+cd /sources
+download ${GNU_MIRROR}/ncurses/ncurses-${NCURSES_VERSION}.tar.gz
 tar -xf ncurses-${NCURSES_VERSION}.tar.gz
 cd ncurses-${NCURSES_VERSION}
 
@@ -30,10 +30,8 @@ for lib in ncurses form panel menu ; do
     ln -sfv lib${lib}w.so /usr/lib/lib${lib}.so
     ln -sfv ${lib}w.pc    /usr/lib/pkgconfig/${lib}.pc
 done
-ln -sv libncursesw.so $LFS/usr/lib/libncurses.so
-sed -e 's/^#if.*XOPEN.*$/#if 1/' \
-    -i $LFS/usr/include/curses.h
+
 ln -sfv libncursesw.so /usr/lib/libcurses.so
 
-cd /tmp
+cd /sources
 rm -rf ncurses-${NCURSES_VERSION} ncurses-${NCURSES_VERSION}.tar.gz

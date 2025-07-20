@@ -1,7 +1,7 @@
-#!/bin/bash -ex
+#!/pass2/bin/bash -ex
 
-cd /tmp
-curl -LO https://www.sourceware.org/pub/bzip2/bzip2-${BZIP2_VERSION}.tar.gz
+cd /sources
+download https://www.sourceware.org/pub/bzip2/bzip2-${BZIP2_VERSION}.tar.gz
 tar -xf bzip2-${BZIP2_VERSION}.tar.gz
 cd bzip2-${BZIP2_VERSION}
 
@@ -21,5 +21,5 @@ for i in /usr/bin/{bzcat,bunzip2}; do
 done
 rm -fv /usr/lib/libbz2.a
 
-cd /tmp
+cd /sources
 rm -rf bzip2-${BZIP2_VERSION} bzip2-${BZIP2_VERSION}.tar.gz

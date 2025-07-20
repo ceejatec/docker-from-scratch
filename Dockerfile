@@ -115,6 +115,7 @@ COPY scripts/5.4-linux-api-headers.sh /lfs-scripts/5.4-linux-api-headers.sh
 RUN /lfs-scripts/5.4-linux-api-headers.sh
 
 # 5.5 Glibc - this (and only this) is installed globally on the LFS filesystem.
+# QQQ remove this ARG
 ARG GLIBC_VERSION=2.28
 COPY scripts/5.5-glibc-pass1.sh /lfs-scripts/5.5-glibc-pass1.sh
 RUN /lfs-scripts/5.5-glibc-pass1.sh
@@ -189,8 +190,11 @@ ARG GZIP_VERSION=1.13
 COPY scripts/6.11-gzip.sh /lfs-scripts/6.11-gzip.sh
 RUN /lfs-scripts/6.11-gzip.sh
 
-# 6.12 Make
-ARG MAKE_VERSION=4.4.1
+# 6.12 Make - note that earlier versions of glibc send make 4.4+ into an
+# infinite loop, so for this pass build make 4.3. We'll build a newer
+# one in pass 3.
+# https://github.com/crosstool-ng/crosstool-ng/issues/1932#issuecomment-1528139734
+ARG PASS2_MAKE_VERSION=4.3
 COPY scripts/6.12-make.sh /lfs-scripts/6.12-make.sh
 RUN /lfs-scripts/6.12-make.sh
 
@@ -235,25 +239,52 @@ USER root
 RUN set -x \
     && mkdir -p ${LFS}/tmp \
     && chmod 1777 ${LFS}/tmp \
+    && rm -rf ${LFS}/pass1 \
     && chown -R root:root ${LFS}
 RUN ln -sf /pass2/bin/bash ${LFS}/bin/sh
 
 FROM scratch AS lfs-chroot
-COPY --from=lfs-build /mnt/lfs /
-
 #
 # PASS 3 - "chroot" by restarting the build from the current LFS image,
 # and rebuild everything into /usr.
 #
 
+COPY --from=lfs-build /mnt/lfs /
+
 # Now we want the /pass2 tools on the PATH, but put them last so that
-# we'll prefer to use the ones we're about to re-build.
-ENV PATH=/bin:/usr/bin:/pass2/bin
+# we'll prefer to use the ones we're about to re-build into /usr. Also
+# add /usr/sbin since several of these tools install there.
+ENV PATH=/bin:/usr/bin:/usr/sbin:/pass2/bin
 ENV LFS_TGT=x86_64-lfs-linux-gnu
 ARG PARALLELISM=8
+ARG GNU_MIRROR=https://mirrors.ocf.berkeley.edu/gnu
 
-# 8.5 glibc - pass 3
+RUN mkdir /sources
+
+# 7.6 Create essential files
+COPY scripts/7.6-essential-files.sh /lfs-scripts/7.6-essential-files.sh
+RUN /lfs-scripts/7.6-essential-files.sh
+
+# 7.7 gettext
+ARG GETTEXT_VERSION=0.24
+COPY scripts/7.7-gettext.sh /lfs-scripts/7.7-gettext.sh
+RUN /lfs-scripts/7.7-gettext.sh
+
+# 7.8 Bison
+ARG BISON_VERSION=3.8.2
+COPY scripts/7.8-bison.sh /lfs-scripts/7.8-bison.sh
+RUN /lfs-scripts/7.8-bison.sh
+
+# 7.9 Perl - NOTE we install this into /pass2 as we only need it for
+# building a few things here in pass3, but don't want it in the final
+# image.
+ARG PERL_VERSION=5.40.1
+COPY scripts/7.9-perl.sh /lfs-scripts/7.9-perl.sh
+RUN /lfs-scripts/7.9-perl.sh
+
+# 8.5.1 install glibc - pass 3
 ARG GLIBC_VERSION=2.28
+ARG TZDATA_VERSION=2025a
 COPY scripts/8.5-glibc-pass3.sh /lfs-scripts/8.5-glibc-pass3.sh
 RUN /lfs-scripts/8.5-glibc-pass3.sh
 
@@ -273,7 +304,7 @@ COPY scripts/8.8-xz.sh /lfs-scripts/8.8-xz.sh
 RUN /lfs-scripts/8.8-xz.sh
 
 # 8.9 LZ4
-ARG LZ4_VERSION=1.10.4
+ARG LZ4_VERSION=1.10.0
 COPY scripts/8.9-lz4.sh /lfs-scripts/8.9-lz4.sh
 RUN /lfs-scripts/8.9-lz4.sh
 
@@ -283,9 +314,9 @@ COPY scripts/8.10-zstd.sh /lfs-scripts/8.10-zstd.sh
 RUN /lfs-scripts/8.10-zstd.sh
 
 # 8.11 File
-ARG FILE_VERSION=5.46
-COPY scripts/8.11-file.sh /lfs-scripts/8.11-file.sh
-RUN /lfs-scripts/8.11-file.sh
+#ARG FILE_VERSION=5.46
+#COPY scripts/8.11-file.sh /lfs-scripts/8.11-file.sh
+#RUN /lfs-scripts/8.11-file.sh
 
 # 8.12 readline
 ARG READLINE_VERSION=8.2.13
@@ -307,32 +338,170 @@ ARG PKGCONF_VERSION=2.3.0
 COPY scripts/8.19-pkgconf.sh /lfs-scripts/8.19-pkgconf.sh
 RUN /lfs-scripts/8.19-pkgconf.sh
 
+# 8.20 Binutils - pass 3
+ARG BINUTILS_VERSION=2.44
+COPY scripts/8.20-binutils-pass3.sh /lfs-scripts/8.20-binutils-pass3.sh
+RUN /lfs-scripts/8.20-binutils-pass3.sh
+
+# 8.21 GMP libraries
+ARG GMP_VERSION=6.2.1
+COPY scripts/8.21-gmp.sh /lfs-scripts/8.21-gmp.sh
+RUN /lfs-scripts/8.21-gmp.sh
+
+# 8.22 MPFR libraries
+ARG MPFR_VERSION=4.1.0
+COPY scripts/8.22-mpfr.sh /lfs-scripts/8.22-mpfr.sh
+RUN /lfs-scripts/8.22-mpfr.sh
+
+# 8.23 MPC libraries
+ARG MPC_VERSION=1.2.1
+COPY scripts/8.23-mpc.sh /lfs-scripts/8.23-mpc.sh
+RUN /lfs-scripts/8.23-mpc.sh
+
+# 8.24 Attributes
+ARG ATTR_VERSION=2.5.2
+COPY scripts/8.24-attr.sh /lfs-scripts/8.24-attr.sh
+RUN /lfs-scripts/8.24-attr.sh
+
+# 8.27 libxcrypt
+ARG LIBXCRYPT_VERSION=4.4.38
+COPY scripts/8.27-libxcrypt.sh /lfs-scripts/8.27-libxcrypt.sh
+RUN /lfs-scripts/8.27-libxcrypt.sh
+
+# 8.28 shadow
+ARG SHADOW_VERSION=4.17.3
+COPY scripts/8.28-shadow.sh /lfs-scripts/8.28-shadow.sh
+RUN /lfs-scripts/8.28-shadow.sh
+
 # 8.29 GCC - pass 3
 ARG GCC_VERSION=13.2.0
-ARG MPFR_VERSION=4.2.1
-ARG GMP_VERSION=6.3.0
-ARG MPC_VERSION=1.3.1
-ARG GNU_MIRROR=https://mirrors.ocf.berkeley.edu/gnu
+COPY scripts/8.29-gcc-pass3.sh /lfs-scripts/8.29-gcc-pass3.sh
+RUN /lfs-scripts/8.29-gcc-pass3.sh
 
 # 8.30 Ncurses
 ARG NCURSES_VERSION=6.5
 COPY scripts/8.30-ncurses.sh /lfs-scripts/8.30-ncurses.sh
 RUN /lfs-scripts/8.30-ncurses.sh
 
+# 8.31 sed
+ARG SED_VERSION=4.9
+COPY scripts/8.31-sed.sh /lfs-scripts/8.31-sed.sh
+RUN /lfs-scripts/8.31-sed.sh
 
-COPY scripts/8.29-gcc-pass3.sh /lfs-scripts/8.29-gcc-pass3.sh
-RUN /lfs-scripts/8.29-gcc-pass3.sh
+# 8.32 psmisc
+ARG PSMISC_VERSION=23.7
+COPY scripts/8.32-psmisc.sh /lfs-scripts/8.32-psmisc.sh
+RUN /lfs-scripts/8.32-psmisc.sh
 
-# # 8.42 Less
-# ARG LESS_VERSION=668
-# COPY scripts/8.42-less.sh /lfs-scripts/8.42-less.sh
-# RUN /lfs-scripts/8.42-less.sh
+# 8.35 grep
+ARG GREP_VERSION=3.11
+COPY scripts/8.35-grep.sh /lfs-scripts/8.35-grep.sh
+RUN /lfs-scripts/8.35-grep.sh
 
-# # 8.84 Strip LFS binaries, inside chroot jail
-# COPY scripts/8.84-stripping.sh /lfs-scripts/8.84-stripping.sh
-# RUN /lfs-scripts/8.84-stripping.sh
+# 8.36 Bash
+# Use BASH_SHELL_VERSION since BASH_VERSION is a built-in variable in bash
+ARG BASH_SHELL_VERSION=5.2.37
+COPY scripts/8.36-bash.sh /lfs-scripts/8.36-bash.sh
+RUN /lfs-scripts/8.36-bash.sh
 
-# RUN rm -rf /lfs-scripts
+# 8.37 libtool
+ARG LIBTOOL_VERSION=2.5.4
+COPY scripts/8.37-libtool.sh /lfs-scripts/8.37-libtool.sh
+RUN /lfs-scripts/8.37-libtool.sh
 
-# FROM scratch AS lfs-final
-# COPY --from=lfs-chroot / /
+# 8.42 Less
+ARG LESS_VERSION=668
+COPY scripts/8.42-less.sh /lfs-scripts/8.42-less.sh
+RUN /lfs-scripts/8.42-less.sh
+
+# 8.46 Autoconf
+ARG AUTOCONF_VERSION=2.72
+COPY scripts/8.46-autoconf.sh /lfs-scripts/8.46-autoconf.sh
+RUN /lfs-scripts/8.46-autoconf.sh
+
+# 8.47 Automake
+ARG AUTOMAKE_VERSION=1.17
+COPY scripts/8.47-automake.sh /lfs-scripts/8.47-automake.sh
+RUN /lfs-scripts/8.47-automake.sh
+
+# 8.48 OpenSSL
+ARG OPENSSL_VERSION=3.4.1
+COPY scripts/8.48-openssl.sh /lfs-scripts/8.48-openssl.sh
+RUN /lfs-scripts/8.48-openssl.sh
+
+# 8.49 Libelf
+ARG LIBELF_VERSION=0.188
+COPY scripts/8.49-libelf.sh /lfs-scripts/8.49-libelf.sh
+RUN /lfs-scripts/8.49-libelf.sh
+
+# 8.50 libffi
+ARG LIBFFI_VERSION=3.4.2
+COPY scripts/8.50-libffi.sh /lfs-scripts/8.50-libffi.sh
+RUN /lfs-scripts/8.50-libffi.sh
+
+# 8.58 coreutils
+ARG COREUTILS_VERSION=9.6
+COPY scripts/8.58-coreutils.sh /lfs-scripts/8.58-coreutils.sh
+RUN /lfs-scripts/8.58-coreutils.sh
+
+# 8.60 diffutils
+ARG DIFFUTILS_VERSION=3.11
+COPY scripts/8.60-diffutils.sh /lfs-scripts/8.60-diffutils.sh
+RUN /lfs-scripts/8.60-diffutils.sh
+
+# 8.61 gawk
+ARG GAWK_VERSION=5.3.1
+COPY scripts/8.61-gawk.sh /lfs-scripts/8.61-gawk.sh
+RUN /lfs-scripts/8.61-gawk.sh
+
+# 8.62 findutils
+ARG FINDUTILS_VERSION=4.10.0
+COPY scripts/8.62-findutils.sh /lfs-scripts/8.62-findutils.sh
+RUN /lfs-scripts/8.62-findutils.sh
+
+# 8.65 gzip
+ARG GZIP_VERSION=1.13
+COPY scripts/8.65-gzip.sh /lfs-scripts/8.65-gzip.sh
+RUN /lfs-scripts/8.65-gzip.sh
+
+# 8.69 make
+# Now we build make 4.4.1, rather than the earlier version we needed due
+# to glibc.
+ARG MAKE_VERSION=4.4.1
+COPY scripts/8.69-make.sh /lfs-scripts/8.69-make.sh
+RUN /lfs-scripts/8.69-make.sh
+
+# 8.70 patch
+ARG PATCH_VERSION=2.7.6
+COPY scripts/8.70-patch.sh /lfs-scripts/8.70-patch.sh
+RUN /lfs-scripts/8.70-patch.sh
+
+# 8.71 tar
+ARG TAR_VERSION=1.35
+COPY scripts/8.71-tar.sh /lfs-scripts/8.71-tar.sh
+RUN /lfs-scripts/8.71-tar.sh
+
+# 8.78 procps-ng
+ARG PROCPS_VERSION=4.0.5
+COPY scripts/8.78-procps.sh /lfs-scripts/8.78-procps.sh
+RUN /lfs-scripts/8.78-procps.sh
+
+# 8.79 util-linux
+ARG UTIL_LINUX_VERSION=2.40.4
+COPY scripts/8.79-util-linux.sh /lfs-scripts/8.79-util-linux.sh
+RUN /lfs-scripts/8.79-util-linux.sh
+
+# Eliminate the /pass2 tools!
+RUN rm -rf /pass2 /sources /lfs-scripts
+
+# Eliminate unwanted docs and stuff
+RUN rm -rf /usr/share/{doc,info,man}
+
+# 8.84 Strip everything
+COPY scripts/8.84-stripping.sh /lfs-scripts/8.84-stripping.sh
+RUN /lfs-scripts/8.84-stripping.sh
+
+RUN rm -rf /lfs-scripts
+
+FROM scratch AS lfs-final
+COPY --from=lfs-chroot / /

@@ -1,7 +1,7 @@
-#!/bin/bash -ex
+#!/pass2/bin/bash -ex
 
-cd /tmp
-curl -LO ${GNU_MIRROR}/readline/readline-${READLINE_VERSION}.tar.gz
+cd /sources
+download ${GNU_MIRROR}/readline/readline-${READLINE_VERSION}.tar.gz
 tar -xf readline-${READLINE_VERSION}.tar.gz
 cd readline-${READLINE_VERSION}
 
@@ -16,5 +16,5 @@ sed -i 's/-Wl,-rpath,[^ ]*//' support/shobj-conf
 make -j${PARALLELISM} SHLIB_LIBS="-lncursesw"
 make install
 
-cd /tmp
+cd /sources
 rm -rf readline-${READLINE_VERSION} readline-${READLINE_VERSION}.tar.gz

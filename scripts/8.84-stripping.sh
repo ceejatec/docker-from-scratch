@@ -62,3 +62,6 @@ for i in $(find /usr/lib -type f -name \*.so* ! -name \*dbg) \
             ;;
     esac
 done
+
+# Handle GCC that we installed in /opt
+find /opt -type f -exec strip --strip-unneeded {} \;

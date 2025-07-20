@@ -1,7 +1,7 @@
-#!/bin/bash -ex
+#!/pass2/bin/bash -ex
 
-cd /tmp
-curl -LO https://zlib.net/zlib-${ZLIB_VERSION}.tar.xz
+cd /sources
+download https://zlib.net/zlib-${ZLIB_VERSION}.tar.xz
 tar -xf zlib-${ZLIB_VERSION}.tar.xz
 cd zlib-${ZLIB_VERSION}
 
@@ -11,5 +11,5 @@ make install
 
 rm -fv /usr/lib/libz.a
 
-cd /tmp
+cd /sources
 rm -rf zlib-${ZLIB_VERSION} zlib-${ZLIB_VERSION}.tar.xz
