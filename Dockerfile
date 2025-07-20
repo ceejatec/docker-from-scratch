@@ -404,6 +404,9 @@ ARG BASH_SHELL_VERSION=5.2.37
 COPY scripts/8.36-bash.sh /lfs-scripts/8.36-bash.sh
 RUN /lfs-scripts/8.36-bash.sh
 
+# Now we can fix up this shell script from glibc to use the new bash
+RUN sed -i -e 's/pass2/usr/' /usr/bin/ldd
+
 # 8.37 libtool
 ARG LIBTOOL_VERSION=2.5.4
 COPY scripts/8.37-libtool.sh /lfs-scripts/8.37-libtool.sh
@@ -505,3 +508,4 @@ RUN rm -rf /lfs-scripts
 
 FROM scratch AS lfs-final
 COPY --from=lfs-chroot / /
+ENV PATH=/opt/gcc-13.2.0/bin:/usr/bin
