@@ -1,4 +1,4 @@
-#!/pass2/bin/bash -ex
+#!/bin/bash -ex
 
 cd /sources
 download https://github.com/tukaani-project/xz/releases/download/v${XZ_VERSION}/xz-${XZ_VERSION}.tar.xz

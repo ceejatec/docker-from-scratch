@@ -1,4 +1,4 @@
-#!/pass2/bin/bash -ex
+#!/bin/bash -ex
 
 cd /sources
 download https://sourceforge.net/projects/procps-ng/files/Production/procps-ng-${PROCPS_VERSION}.tar.xz

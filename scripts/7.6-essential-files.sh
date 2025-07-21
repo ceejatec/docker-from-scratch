@@ -1,4 +1,4 @@
-#!/pass2/bin/bash -ex
+#!/bin/bash -ex
 
 ln -sv /proc/self/mounts /etc/mtab
 

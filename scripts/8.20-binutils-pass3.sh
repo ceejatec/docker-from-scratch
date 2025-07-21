@@ -1,4 +1,4 @@
-#!/pass2/bin/bash -ex
+#!/bin/bash -ex
 
 cd /tmp
 download https://sourceware.org/pub/binutils/releases/binutils-${BINUTILS_VERSION}.tar.xz

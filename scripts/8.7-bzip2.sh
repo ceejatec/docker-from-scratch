@@ -1,4 +1,4 @@
-#!/pass2/bin/bash -ex
+#!/bin/bash -ex
 
 cd /sources
 download https://www.sourceware.org/pub/bzip2/bzip2-${BZIP2_VERSION}.tar.gz

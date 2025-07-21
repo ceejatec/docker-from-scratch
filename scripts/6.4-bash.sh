@@ -14,5 +14,9 @@ make DESTDIR=$LFS install
 # Symlink for sh
 ln -sv bash $LFS/bin/sh
 
+# Symlinks for scripts in pass2
+ln -sfv /pass2/bin/bash $LFS/bin/bash
+ln -sfv /pass2/bin/bash $LFS/bin/sh
+
 cd $LFS_SRC
 rm -rf bash-${BASH_SHELL_VERSION} bash-${BASH_SHELL_VERSION}.tar.gz

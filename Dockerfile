@@ -227,14 +227,15 @@ COPY scripts/6.18-gcc-pass2.sh /lfs-scripts/6.18-gcc-pass2.sh
 RUN /lfs-scripts/6.18-gcc-pass2.sh
 
 # 6.xx - Add httpie so the image has a way to download files without
-# needing to install openssl (which requires installing perl....)
+# needing to install openssl (which requires installing perl....). Put
+# this into /pass3 because it will still be used when we get to BLFS
+# packages.
 ARG HTTPIE_VERSION=3.4.0
-ARG ZLIB_VERSION=1.3.1
 COPY scripts/6.xx-httpie.sh /lfs-scripts/6.xx-httpie.sh
 RUN /lfs-scripts/6.xx-httpie.sh
 
 # 7.2 Clean up LFS - chown everything back to root, and delete /pass1.
-# Also create /tmp.
+# Also create /tmp, and symlink /bin/bash to /pass2/bin/bash.
 USER root
 RUN set -x \
     && mkdir -p ${LFS}/tmp \
@@ -244,6 +245,7 @@ RUN set -x \
 RUN ln -sf /pass2/bin/bash ${LFS}/bin/sh
 
 FROM scratch AS lfs-chroot
+
 #
 # PASS 3 - "chroot" by restarting the build from the current LFS image,
 # and rebuild everything into /usr.
@@ -252,9 +254,10 @@ FROM scratch AS lfs-chroot
 COPY --from=lfs-build /mnt/lfs /
 
 # Now we want the /pass2 tools on the PATH, but put them last so that
-# we'll prefer to use the ones we're about to re-build into /usr. Also
-# add /usr/sbin since several of these tools install there.
-ENV PATH=/bin:/usr/bin:/usr/sbin:/pass2/bin
+# we'll prefer to use the ones we're about to re-build into /usr. We
+# also want /httpie which only has the `download` script. Also add
+# /usr/sbin since several of these tools install there.
+ENV PATH=/bin:/usr/bin:/usr/sbin:/pass2/bin:/httpie/bin
 ENV LFS_TGT=x86_64-lfs-linux-gnu
 ARG PARALLELISM=8
 ARG GNU_MIRROR=https://mirrors.ocf.berkeley.edu/gnu
@@ -314,9 +317,13 @@ COPY scripts/8.10-zstd.sh /lfs-scripts/8.10-zstd.sh
 RUN /lfs-scripts/8.10-zstd.sh
 
 # 8.11 File
-#ARG FILE_VERSION=5.46
-#COPY scripts/8.11-file.sh /lfs-scripts/8.11-file.sh
-#RUN /lfs-scripts/8.11-file.sh
+# Note: versions of file >= 5.38 use `sscanf()` to parse GUIDs, and this
+# fails with glibc 2.28 in this image. I spent hours tracking that down,
+# and more hours trying to find a workaround, but it seems like the
+# easiest thing is just to use an earlier version of file.
+ARG FILE_VERSION=5.38
+COPY scripts/8.11-file.sh /lfs-scripts/8.11-file.sh
+RUN /lfs-scripts/8.11-file.sh
 
 # 8.12 readline
 ARG READLINE_VERSION=8.2.13
@@ -343,21 +350,6 @@ ARG BINUTILS_VERSION=2.44
 COPY scripts/8.20-binutils-pass3.sh /lfs-scripts/8.20-binutils-pass3.sh
 RUN /lfs-scripts/8.20-binutils-pass3.sh
 
-# 8.21 GMP libraries
-ARG GMP_VERSION=6.2.1
-COPY scripts/8.21-gmp.sh /lfs-scripts/8.21-gmp.sh
-RUN /lfs-scripts/8.21-gmp.sh
-
-# 8.22 MPFR libraries
-ARG MPFR_VERSION=4.1.0
-COPY scripts/8.22-mpfr.sh /lfs-scripts/8.22-mpfr.sh
-RUN /lfs-scripts/8.22-mpfr.sh
-
-# 8.23 MPC libraries
-ARG MPC_VERSION=1.2.1
-COPY scripts/8.23-mpc.sh /lfs-scripts/8.23-mpc.sh
-RUN /lfs-scripts/8.23-mpc.sh
-
 # 8.24 Attributes
 ARG ATTR_VERSION=2.5.2
 COPY scripts/8.24-attr.sh /lfs-scripts/8.24-attr.sh
@@ -374,6 +366,13 @@ COPY scripts/8.28-shadow.sh /lfs-scripts/8.28-shadow.sh
 RUN /lfs-scripts/8.28-shadow.sh
 
 # 8.29 GCC - pass 3
+# Note: LFS builds GMP, MPRF, and MPC separately, installing them into
+# /usr. Since we're installing gcc into /opt and may want to have
+# several versions of gcc installed, we integrate the build for those
+# libraries into the gcc build script.
+ARG GMP_VERSION=6.2.1
+ARG MPFR_VERSION=4.1.0
+ARG MPC_VERSION=1.2.1
 ARG GCC_VERSION=13.2.0
 COPY scripts/8.29-gcc-pass3.sh /lfs-scripts/8.29-gcc-pass3.sh
 RUN /lfs-scripts/8.29-gcc-pass3.sh
@@ -442,6 +441,8 @@ ARG LIBFFI_VERSION=3.4.2
 COPY scripts/8.50-libffi.sh /lfs-scripts/8.50-libffi.sh
 RUN /lfs-scripts/8.50-libffi.sh
 
+# 8.55 - note that we install Ninja later in the BLFS section.
+
 # 8.58 coreutils
 ARG COREUTILS_VERSION=9.6
 COPY scripts/8.58-coreutils.sh /lfs-scripts/8.58-coreutils.sh
@@ -494,11 +495,9 @@ ARG UTIL_LINUX_VERSION=2.40.4
 COPY scripts/8.79-util-linux.sh /lfs-scripts/8.79-util-linux.sh
 RUN /lfs-scripts/8.79-util-linux.sh
 
-# Eliminate the /pass2 tools!
-RUN rm -rf /pass2 /sources /lfs-scripts
-
-# Eliminate unwanted docs and stuff
-RUN rm -rf /usr/share/{doc,info,man}
+# Various cleanups and fixups
+COPY scripts/8.xx-cleanup.sh /lfs-scripts/8.xx-cleanup.sh
+RUN /lfs-scripts/8.xx-cleanup.sh
 
 # 8.84 Strip everything
 COPY scripts/8.84-stripping.sh /lfs-scripts/8.84-stripping.sh
@@ -506,6 +505,54 @@ RUN /lfs-scripts/8.84-stripping.sh
 
 RUN rm -rf /lfs-scripts
 
-FROM scratch AS lfs-final
+FROM scratch AS blfs
+
+#
+# PASS 4: Build BLFS packages.
+#
+
 COPY --from=lfs-chroot / /
-ENV PATH=/opt/gcc-13.2.0/bin:/usr/bin
+ENV PATH=/opt/gcc-13.2.0/bin:/usr/bin:/usr/sbin:/httpie/bin
+ARG GNU_MIRROR=https://mirrors.ocf.berkeley.edu/gnu
+ARG PARALLELISM=8
+
+RUN mkdir /sources
+
+# All we *really* want here is curl and git. However, curl requires
+# libpsl and make-ca; libpsl requires libidn2, libunistring, and
+# (build-time only) meson and ninja; meson requires python3; make-ca
+# requires p11-kit which in turn requires libtasn1. Ideally we want to
+# avoid installing meson, python3, make-ca, and p11-kit in the final
+# image - we're OK with adding libpsl, libidn2, libunistring, libtasn1,
+# and ninja. Also, since we install ninja as a binary package, we need
+# 7zip to unpack it, which we may as well add to the final image also.
+
+# libunistring
+ARG LIBUNISTRING_VERSION=1.3
+COPY scripts/blfs-libunistring.sh /lfs-scripts/blfs-libunistring.sh
+RUN /lfs-scripts/blfs-libunistring.sh
+
+# libidn2
+ARG LIBIDN2_VERSION=2.3.8
+COPY scripts/blfs-libidn2.sh /lfs-scripts/blfs-libidn2.sh
+RUN /lfs-scripts/blfs-libidn2.sh
+
+# libtasn1
+ARG LIBTASN1_VERSION=4.20.0
+COPY scripts/blfs-libtasn1.sh /lfs-scripts/blfs-libtasn1.sh
+RUN /lfs-scripts/blfs-libtasn1.sh
+
+# 7zip
+ARG SEVENZIP_VERSION=25.00
+COPY scripts/blfs-7zip.sh /lfs-scripts/blfs-7zip.sh
+RUN /lfs-scripts/blfs-7zip.sh
+
+# ninja (from binary package)
+ARG NINJA_VERSION=1.13.1
+COPY scripts/blfs-ninja.sh /lfs-scripts/blfs-ninja.sh
+RUN /lfs-scripts/blfs-ninja.sh
+
+# libpsl
+ARG LIBPSL_VERSION=0.21.5
+COPY scripts/blfs-libpsl.sh /lfs-scripts/blfs-libpsl.sh
+RUN /lfs-scripts/blfs-libpsl.sh

@@ -1,4 +1,4 @@
-#!/pass2/bin/bash -ex
+#!/bin/bash -ex
 
 cd /sources
 https --download https://www.greenwoodsoftware.com/less/less-${LESS_VERSION}.tar.gz -o less-${LESS_VERSION}.tar.gz

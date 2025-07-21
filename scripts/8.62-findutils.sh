@@ -1,4 +1,4 @@
-#!/pass2/bin/bash -ex
+#!/bin/bash -ex
 
 cd /sources
 download ${GNU_MIRROR}/findutils/findutils-${FINDUTILS_VERSION}.tar.xz

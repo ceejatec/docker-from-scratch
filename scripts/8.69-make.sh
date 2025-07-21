@@ -1,4 +1,4 @@
-#!/pass2/bin/bash -ex
+#!/bin/bash -ex
 
 cd /sources
 download ${GNU_MIRROR}/make/make-${MAKE_VERSION}.tar.gz

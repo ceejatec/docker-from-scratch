@@ -1,10 +1,19 @@
-#!/pass2/bin/bash -ex
+#!/bin/bash -ex
 
 # Download all source
 cd /sources
-http --download GET ${GNU_MIRROR}/gcc/gcc-${GCC_VERSION}/gcc-${GCC_VERSION}.tar.xz -o gcc-${GCC_VERSION}.tar.xz
+download ${GNU_MIRROR}/gcc/gcc-${GCC_VERSION}/gcc-${GCC_VERSION}.tar.xz
 tar -xf gcc-${GCC_VERSION}.tar.xz
 cd gcc-${GCC_VERSION}
+download ${GNU_MIRROR}/gmp/gmp-${GMP_VERSION}.tar.xz
+tar -xf gmp-${GMP_VERSION}.tar.xz
+mv gmp-${GMP_VERSION} gmp
+download ${GNU_MIRROR}/mpfr/mpfr-${MPFR_VERSION}.tar.xz
+tar -xf mpfr-${MPFR_VERSION}.tar.xz
+mv mpfr-${MPFR_VERSION} mpfr
+download ${GNU_MIRROR}/mpc/mpc-${MPC_VERSION}.tar.gz
+tar -xf mpc-${MPC_VERSION}.tar.gz
+mv mpc-${MPC_VERSION} mpc
 
 # Set default directory names to 'lib'
 case $(uname -m) in

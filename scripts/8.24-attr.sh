@@ -1,4 +1,4 @@
-#!/pass2/bin/bash -ex
+#!/bin/bash -ex
 
 cd /sources
 download https://download.savannah.gnu.org/releases/attr/attr-${ATTR_VERSION}.tar.gz

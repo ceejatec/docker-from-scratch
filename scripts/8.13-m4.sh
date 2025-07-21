@@ -1,4 +1,4 @@
-#!/pass2/bin/bash -ex
+#!/bin/bash -ex
 
 cd /sources
 download ${GNU_MIRROR}/m4/m4-${M4_VERSION}.tar.xz

@@ -1,4 +1,4 @@
-#!/pass2/bin/bash -ex
+#!/bin/bash -ex
 
 cd /sources
 download https://sourceforge.net/projects/psmisc/files/psmisc/psmisc-${PSMISC_VERSION}.tar.xz
