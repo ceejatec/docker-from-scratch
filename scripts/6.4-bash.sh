@@ -14,7 +14,7 @@ make DESTDIR=$LFS install
 # Symlink for sh
 ln -sv bash $LFS/bin/sh
 
-# Symlinks for scripts in pass2
+# Symlinks for scripts running in pass 3
 ln -sfv /pass2/bin/bash $LFS/bin/bash
 ln -sfv /pass2/bin/bash $LFS/bin/sh
 

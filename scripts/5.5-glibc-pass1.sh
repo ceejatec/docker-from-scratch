@@ -4,10 +4,19 @@ cd $LFS_SRC
 curl -LO ${GNU_MIRROR}/glibc/glibc-${GLIBC_VERSION}.tar.xz
 tar -xf glibc-${GLIBC_VERSION}.tar.xz
 cd glibc-${GLIBC_VERSION}
+
+# glibc's ld.so will be built as /usr/lib/ld-${GLIBC_VERSION}.so (under
+# $LFS), with /usr/lib/ld-linux-x86-64.so.2 as a symlink to it.
+# According to LFS, we want these two files in /lib64 to point to that
+# file. However, we need to point directly at ld-${GLIBC_VERSION}.so
+# rather than indirect through /usr/lib/ld-linux-x86-64.so.2, because
+# (much later) uv will use the target of /lib64/ld-linux-x86-64.so.2 to
+# introspect the glibc version, and it doesn't follow more than one
+# symlink.
 case $(uname -m) in
   x86_64)
-    ln -sfv ../lib/ld-linux-x86-64.so.2 $LFS/lib64 ;
-    ln -sfv ../lib/ld-linux-x86-64.so.2 $LFS/lib64/ld-lsb-x86-64.so.3
+    ln -sfv ../lib/ld-${GLIBC_VERSION}.so $LFS/lib64/ld-linux-x86-64.so.2
+    ln -sfv ../lib/ld-${GLIBC_VERSION}.so $LFS/lib64/ld-lsb-x86-64.so.3
   ;;
 esac
 

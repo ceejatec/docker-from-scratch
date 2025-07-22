@@ -228,21 +228,20 @@ RUN /lfs-scripts/6.18-gcc-pass2.sh
 
 # 6.xx - Add httpie so the image has a way to download files without
 # needing to install openssl (which requires installing perl....). Put
-# this into /pass3 because it will still be used when we get to BLFS
+# this into /httpie because it will still be used when we get to BLFS
 # packages.
 ARG HTTPIE_VERSION=3.4.0
 COPY scripts/6.xx-httpie.sh /lfs-scripts/6.xx-httpie.sh
 RUN /lfs-scripts/6.xx-httpie.sh
 
 # 7.2 Clean up LFS - chown everything back to root, and delete /pass1.
-# Also create /tmp, and symlink /bin/bash to /pass2/bin/bash.
+# Also create /tmp.
 USER root
 RUN set -x \
     && mkdir -p ${LFS}/tmp \
     && chmod 1777 ${LFS}/tmp \
     && rm -rf ${LFS}/pass1 \
     && chown -R root:root ${LFS}
-RUN ln -sf /pass2/bin/bash ${LFS}/bin/sh
 
 FROM scratch AS lfs-chroot
 
@@ -499,13 +498,16 @@ RUN /lfs-scripts/8.79-util-linux.sh
 COPY scripts/8.xx-cleanup.sh /lfs-scripts/8.xx-cleanup.sh
 RUN /lfs-scripts/8.xx-cleanup.sh
 
+# QQQ move this back to 8.29-gcc-pass3.sh
+RUN cp -a /opt/gcc-13.2.0/lib/libstdc++* /usr/lib/ && ldconfig
+
 # 8.84 Strip everything
 COPY scripts/8.84-stripping.sh /lfs-scripts/8.84-stripping.sh
 RUN /lfs-scripts/8.84-stripping.sh
 
 RUN rm -rf /lfs-scripts
 
-FROM scratch AS blfs
+FROM scratch AS blfs-stage1
 
 #
 # PASS 4: Build BLFS packages.
@@ -519,13 +521,8 @@ ARG PARALLELISM=8
 RUN mkdir /sources
 
 # All we *really* want here is curl and git. However, curl requires
-# libpsl and make-ca; libpsl requires libidn2, libunistring, and
-# (build-time only) meson and ninja; meson requires python3; make-ca
-# requires p11-kit which in turn requires libtasn1. Ideally we want to
-# avoid installing meson, python3, make-ca, and p11-kit in the final
-# image - we're OK with adding libpsl, libidn2, libunistring, libtasn1,
-# and ninja. Also, since we install ninja as a binary package, we need
-# 7zip to unpack it, which we may as well add to the final image also.
+# libpsl, and libpsl in turn requires libidn2 and libunistring. So start
+# by installing those.
 
 # libunistring
 ARG LIBUNISTRING_VERSION=1.3
@@ -537,12 +534,11 @@ ARG LIBIDN2_VERSION=2.3.8
 COPY scripts/blfs-libidn2.sh /lfs-scripts/blfs-libidn2.sh
 RUN /lfs-scripts/blfs-libidn2.sh
 
-# libtasn1
-ARG LIBTASN1_VERSION=4.20.0
-COPY scripts/blfs-libtasn1.sh /lfs-scripts/blfs-libtasn1.sh
-RUN /lfs-scripts/blfs-libtasn1.sh
+# libpsl requires ninja to build. We're OK with this in the final image,
+# although we install it from a binary download which in turn requires
+# 7zip. Guess it's fine to have that in the final image too.
 
-# 7zip
+# 7zip (from binary package)
 ARG SEVENZIP_VERSION=25.00
 COPY scripts/blfs-7zip.sh /lfs-scripts/blfs-7zip.sh
 RUN /lfs-scripts/blfs-7zip.sh
@@ -552,7 +548,76 @@ ARG NINJA_VERSION=1.13.1
 COPY scripts/blfs-ninja.sh /lfs-scripts/blfs-ninja.sh
 RUN /lfs-scripts/blfs-ninja.sh
 
+# However, libpsl and p11-kit also requires meson to build, which we
+# DON'T want in the final image. We will install it temporarily using
+# our good friend UV. UV will put everything (including itself) under
+# /root/.local and /root/.cache. We will prune these afterwards.
+ARG MESON_VERSION=1.7.0
+ARG UV_VERSION=0.8.0
+COPY scripts/blfs-meson-temp.sh /lfs-scripts/blfs-meson-temp.sh
+RUN /lfs-scripts/blfs-meson-temp.sh
+
 # libpsl
 ARG LIBPSL_VERSION=0.21.5
 COPY scripts/blfs-libpsl.sh /lfs-scripts/blfs-libpsl.sh
 RUN /lfs-scripts/blfs-libpsl.sh
+
+# Also, before we build curl, we need to install the CA certificates.
+# LFS offers a useful tool to do the complex machinations for this,
+# called make-ca. However, we don't need this tool in the final image.
+# Also, make-ca requires p11-kit, which we'd prefer not to install in
+# the final image. Unfortunately, make-ca really can't do its job
+# without being installed globally. So, we're about to take a little
+# side trip where we install p11-kit and make-ca into a temporary image,
+# and then jump back to this image and just copy /etc/pki and /etc/ssl
+# from the temporary image.
+
+# First, though, p11-kit requires libtasn1, which we may as well have in
+# the final image.
+ARG LIBTASN1_VERSION=4.20.0
+COPY scripts/blfs-libtasn1.sh /lfs-scripts/blfs-libtasn1.sh
+RUN /lfs-scripts/blfs-libtasn1.sh
+
+FROM blfs-stage1 AS blfs-make-ca
+
+# make-ca, which also builds p11-kit
+ARG MAKE_CA_VERSION=1.16.1
+ARG P11_KIT_VERSION=0.25.5
+COPY scripts/blfs-make-ca.sh /lfs-scripts/blfs-make-ca.sh
+RUN /lfs-scripts/blfs-make-ca.sh
+
+FROM blfs-stage1 AS blfs-stage2
+
+# Now we can copy the CA certificates from the temporary image.
+COPY --from=blfs-make-ca /etc/pki /etc/pki
+COPY --from=blfs-make-ca /etc/ssl /etc/ssl
+
+# At long last: curl!
+ARG CURL_VERSION=8.15.0
+COPY scripts/blfs-curl.sh /lfs-scripts/blfs-curl.sh
+RUN /lfs-scripts/blfs-curl.sh
+
+# Final strip. Re-use the script from step 8.84. Note: we do this before
+# compiling git, because git makes heavy use of hard-linked files -
+# stripping them after installation will break the hard links, consuming
+# far more disk space.
+COPY scripts/8.84-stripping.sh /lfs-scripts/8.84-stripping.sh
+RUN /lfs-scripts/8.84-stripping.sh
+
+# And finally, git.
+ARG GIT_VERSION=2.50.1
+COPY scripts/blfs-git.sh /lfs-scripts/blfs-git.sh
+RUN /lfs-scripts/blfs-git.sh
+
+# Final cleanup! Get rid of UV/meson; httpie; all the build scripts; and
+# anything in /tmp.
+RUN set -x \
+    && rm -rf /root/.local /root/.cache \
+    && rm -rf /httpie \
+    && rm -rf /lfs-scripts /sources \
+    && rm -rf /tmp/*
+
+# Flatten the final image.
+
+FROM scratch AS docker-from-scratch
+COPY --from=blfs-stage2 / /

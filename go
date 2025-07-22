@@ -1,3 +1,3 @@
 #!/bin/bash
 
-docker build -t couchbasebuild/lfs .
+docker build -t couchbasebuild/dfs .
