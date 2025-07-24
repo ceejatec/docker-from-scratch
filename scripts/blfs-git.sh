@@ -8,7 +8,7 @@ cd git-${GIT_VERSION}
 ./configure --prefix=/usr \
             --with-gitconfig=/etc/gitconfig
 make -j${PARALLELISM}
-make install
+make INSTALL_STRIP=-s install
 
 cd /sources
 rm -rf git-${GIT_VERSION} git-${GIT_VERSION}.tar.xz

@@ -625,13 +625,9 @@ ARG GIT_VERSION=2.50.1
 COPY scripts/blfs-git.sh /lfs-scripts/blfs-git.sh
 RUN /lfs-scripts/blfs-git.sh
 
-# Final cleanup! Get rid of UV/meson; httpie; all the build scripts; and
-# anything in /tmp.
-RUN set -x \
-    && rm -rf /root/.local /root/.cache \
-    && rm -rf /httpie \
-    && rm -rf /lfs-scripts /sources \
-    && rm -rf /tmp/*
+# Final cleanup!
+COPY scripts/blfs-cleanup.sh /lfs-scripts/blfs-cleanup.sh
+RUN /lfs-scripts/blfs-cleanup.sh
 
 # Flatten the final image.
 
@@ -640,3 +636,5 @@ COPY --from=blfs-stage2 / /
 
 RUN mkdir -pv /usr/local/bin
 ENV PATH=/opt/gcc-13.2.0/bin:/usr/bin:/usr/local/bin:/usr/sbin
+ENV LANG=en_US.UTF-8
+CMD ["bash"]
