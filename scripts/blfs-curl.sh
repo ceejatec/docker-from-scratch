@@ -11,9 +11,7 @@ cd curl-${CURL_VERSION}
             --with-ca-path=/etc/ssl/certs \
             --disable-docs
 
-# The curl build system is a bit broken without perl, so we need to run
-# make twice.
-make -j${PARALLELISM} || make -j${PARALLELISM}
+make -j${PARALLELISM}
 
 # Install stripped binaries - can't strip them after the fact because
 # one file is hard-linked many dozens of times

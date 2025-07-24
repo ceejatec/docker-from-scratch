@@ -84,6 +84,15 @@ ARG PARALLELISM=8
 # outside the LFS filesystem, but the that eventually fails when trying
 # to build libstdc++.
 #
+# Note that we don't necessarily build the same gcc here as we want in
+# the final image. We need to build a gcc that we are sure will build
+# our final glibc correctly. In particular, glibc 2.28 has a bug that
+# causes scanf() and friends to fail when it is built with gcc 13.2.0,
+# leading to nasty subtle bugs in at least the "file" command and with
+# GCC LTO. So, we build an earlier version of gcc first, specified by
+# the build arg INITIAL_GCC_VERSION, which will be used to build
+# everything up until the final (pass 3) gcc build.
+#
 
 # 5.2 Binutils - pass 1
 
@@ -95,7 +104,7 @@ RUN /lfs-scripts/5.2-binutils-pass1.sh
 
 # 5.3 GCC - pass 1
 ARG GLIBC_VERSION=2.28
-ARG GCC_VERSION=13.2.0
+ARG INITIAL_GCC_VERSION=10.2.0
 ARG MPFR_VERSION=4.2.1
 ARG GMP_VERSION=6.3.0
 ARG MPC_VERSION=1.3.1
@@ -115,12 +124,11 @@ COPY scripts/5.4-linux-api-headers.sh /lfs-scripts/5.4-linux-api-headers.sh
 RUN /lfs-scripts/5.4-linux-api-headers.sh
 
 # 5.5 Glibc - this (and only this) is installed globally on the LFS filesystem.
-# QQQ remove this ARG
 ARG GLIBC_VERSION=2.28
 COPY scripts/5.5-glibc-pass1.sh /lfs-scripts/5.5-glibc-pass1.sh
 RUN /lfs-scripts/5.5-glibc-pass1.sh
 
-# 5.6 Libstdc++
+# 5.6 Libstdc++ also built from INITIAL_GCC_VERSION
 COPY scripts/5.6-libstdc++.sh /lfs-scripts/5.6-libstdc++.sh
 RUN /lfs-scripts/5.6-libstdc++.sh
 
@@ -222,7 +230,7 @@ RUN /lfs-scripts/6.16-xz.sh
 COPY scripts/6.17-binutils-pass2.sh /lfs-scripts/6.17-binutils-pass2.sh
 RUN /lfs-scripts/6.17-binutils-pass2.sh
 
-# 6.18 GCC - pass 2
+# 6.18 GCC - pass 2 (still building INITIAL_GCC_VERSION)
 COPY scripts/6.18-gcc-pass2.sh /lfs-scripts/6.18-gcc-pass2.sh
 RUN /lfs-scripts/6.18-gcc-pass2.sh
 
@@ -277,9 +285,7 @@ ARG BISON_VERSION=3.8.2
 COPY scripts/7.8-bison.sh /lfs-scripts/7.8-bison.sh
 RUN /lfs-scripts/7.8-bison.sh
 
-# 7.9 Perl - NOTE we install this into /pass2 as we only need it for
-# building a few things here in pass3, but don't want it in the final
-# image.
+# 7.9 Perl
 ARG PERL_VERSION=5.40.1
 COPY scripts/7.9-perl.sh /lfs-scripts/7.9-perl.sh
 RUN /lfs-scripts/7.9-perl.sh
@@ -498,9 +504,6 @@ RUN /lfs-scripts/8.79-util-linux.sh
 COPY scripts/8.xx-cleanup.sh /lfs-scripts/8.xx-cleanup.sh
 RUN /lfs-scripts/8.xx-cleanup.sh
 
-# QQQ move this back to 8.29-gcc-pass3.sh
-RUN cp -a /opt/gcc-13.2.0/lib/libstdc++* /usr/lib/ && ldconfig
-
 # 8.84 Strip everything
 COPY scripts/8.84-stripping.sh /lfs-scripts/8.84-stripping.sh
 RUN /lfs-scripts/8.84-stripping.sh
@@ -597,6 +600,19 @@ ARG CURL_VERSION=8.15.0
 COPY scripts/blfs-curl.sh /lfs-scripts/blfs-curl.sh
 RUN /lfs-scripts/blfs-curl.sh
 
+# Sudo
+ARG SUDO_VERSION=1.9.17p1
+COPY scripts/blfs-sudo.sh /lfs-scripts/blfs-sudo.sh
+RUN /lfs-scripts/blfs-sudo.sh
+
+# OpenSSH
+ARG OPENSSH_VERSION=10.0p1
+COPY scripts/blfs-openssh.sh /lfs-scripts/blfs-openssh.sh
+RUN /lfs-scripts/blfs-openssh.sh
+
+# Fake "which" from BLFS
+COPY scripts/which /usr/bin/which
+
 # Final strip. Re-use the script from step 8.84. Note: we do this before
 # compiling git, because git makes heavy use of hard-linked files -
 # stripping them after installation will break the hard links, consuming
@@ -621,3 +637,6 @@ RUN set -x \
 
 FROM scratch AS docker-from-scratch
 COPY --from=blfs-stage2 / /
+
+RUN mkdir -pv /usr/local/bin
+ENV PATH=/opt/gcc-13.2.0/bin:/usr/bin:/usr/local/bin:/usr/sbin

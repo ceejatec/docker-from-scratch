@@ -2,9 +2,9 @@
 
 # Download all source
 cd $LFS_SRC
-curl -LO ${GNU_MIRROR}/gcc/gcc-${GCC_VERSION}/gcc-${GCC_VERSION}.tar.xz
-tar -xf gcc-${GCC_VERSION}.tar.xz
-cd gcc-${GCC_VERSION}
+curl -LO ${GNU_MIRROR}/gcc/gcc-${INITIAL_GCC_VERSION}/gcc-${INITIAL_GCC_VERSION}.tar.xz
+tar -xf gcc-${INITIAL_GCC_VERSION}.tar.xz
+cd gcc-${INITIAL_GCC_VERSION}
 curl -LO ${GNU_MIRROR}/gmp/gmp-${GMP_VERSION}.tar.xz
 tar -xf gmp-${GMP_VERSION}.tar.xz
 mv gmp-${GMP_VERSION} gmp
@@ -52,4 +52,4 @@ make DESTDIR=$LFS install
 ln -sv gcc $LFS/pass2/bin/cc
 
 cd $LFS_SRC
-rm -rf gcc-${GCC_VERSION} gcc-${GCC_VERSION}.tar.xz
+rm -rf gcc-${INITIAL_GCC_VERSION} gcc-${INITIAL_GCC_VERSION}.tar.xz

@@ -46,8 +46,11 @@ make install
 
 ln -sv gcc /opt/gcc-${GCC_VERSION}/bin/cc
 
+# We need a system libstdc++ too, may as well use this one
+cp -a /opt/gcc-${GCC_VERSION}/lib/libstdc++* /usr/lib/ && ldconfig
+
 # Enable link-time optimization
-ln -sfv ../../libexec/gcc/$(gcc -dumpmachine)/${GCC_VERSION}/liblto_plugin.so \
+ln -sfv ../../opt/gcc-${GCC_VERSION}/libexec/gcc/$(gcc -dumpmachine)/${GCC_VERSION}/liblto_plugin.so \
         /usr/lib/bfd-plugins/
 
 # Basic test

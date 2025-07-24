@@ -32,6 +32,34 @@ sed '/RTLDLIST=/s@/usr@@g' -i /usr/bin/ldd
 # ...and we need this
 ldconfig
 
+# Test case: when building glibc 2.28 with gcc 13.2.0, this fails!
+cat > dummy.c << "EOF"
+#include <stdio.h>
+
+int main() {
+    FILE* file = fopen("testdata.txt", "r");
+    unsigned offset;
+    long long hash;
+    char type[64];
+
+    if (fscanf(file, "%u %llx %26s %*[^\n]\n", &offset, &hash, type) == 3) {
+        printf("  offset=%d, hash=%llx, type=%s\n",
+               offset, hash, type);
+    } else {
+        printf("Error: Could not read entry\n");
+        return 1;
+    }
+    fclose(file);
+    return 0;
+}
+EOF
+cat > testdata.txt << "EOF"
+762 f55225f3e89a6511 RESOLVED_IR _ZN17double_conversion
+EOF
+gcc -o dummy dummy.c
+
+./dummy
+
 # 8.5.2 configure glibc
 
 # Create locales
