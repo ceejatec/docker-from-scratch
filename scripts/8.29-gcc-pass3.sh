@@ -46,8 +46,10 @@ make install
 
 ln -sv gcc /opt/gcc-${GCC_VERSION}/bin/cc
 
-# We need a system libstdc++ too, may as well use this one
-cp -a /opt/gcc-${GCC_VERSION}/lib/libstdc++* /usr/lib/ && ldconfig
+# Add to ld.so.conf - necessary for built programs to find libstdc++,
+# libgomp, etc.
+echo "/opt/gcc-${GCC_VERSION}/lib" > /etc/ld.so.conf.d/gcc-${GCC_VERSION}.conf
+ldconfig
 
 # Enable link-time optimization
 ln -sfv ../../opt/gcc-${GCC_VERSION}/libexec/gcc/$(gcc -dumpmachine)/${GCC_VERSION}/liblto_plugin.so \

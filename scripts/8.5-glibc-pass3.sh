@@ -22,8 +22,12 @@ echo "rootsbindir=/usr/sbin" > configparms
 
 make -j${PARALLELISM}
 
+# Initialize ld.so.conf
+mkdir -pv /etc/ld.so.conf.d
+echo "include ld.so.conf.d/*.conf" > /etc/ld.so.conf
+
 # We need this for now
-echo "/pass2/lib" > /etc/ld.so.conf
+echo "/pass2/lib" > /etc/ld.so.conf.d/pass2.conf
 
 sed '/test-installation/s@$(PERL)@echo not running@' -i ../Makefile
 make install
