@@ -61,10 +61,10 @@ RUN set -x \
     && chown -R lfs:lfs $LFS $LFS_SRC
 
 # 4.4 Set up the environment for building LFS.
-ARG TARGETARCH
 ENV LC_ALL=POSIX
-# QQQ!
-ENV LFS_TGT=x86_64-lfs-linux-gnu
+# LFS_TGT is set in individual shell scripts as it needs to vary by
+# architecture (and not in a way that Dockerfile's TARGETARCH can help
+# with).
 ENV PATH=${LFS}/pass1/bin:/bin:/usr/bin
 ENV CONFIG_SITE=${LFS_SRC}/usr/share/config.site
 RUN rm /etc/bash.bashrc
@@ -72,6 +72,7 @@ RUN rm /etc/bash.bashrc
 USER lfs
 
 ARG PARALLELISM=8
+ARG GNU_MIRROR=https://mirrors.ocf.berkeley.edu/gnu
 
 #
 # The goal here is to create a minimal working environment - with a
@@ -108,7 +109,6 @@ ARG INITIAL_GCC_VERSION=10.2.0
 ARG MPFR_VERSION=4.2.1
 ARG GMP_VERSION=6.3.0
 ARG MPC_VERSION=1.3.1
-ARG GNU_MIRROR=https://mirrors.ocf.berkeley.edu/gnu
 COPY scripts/5.3-gcc-pass1.sh /lfs-scripts/5.3-gcc-pass1.sh
 RUN /lfs-scripts/5.3-gcc-pass1.sh
 
@@ -234,13 +234,12 @@ RUN /lfs-scripts/6.17-binutils-pass2.sh
 COPY scripts/6.18-gcc-pass2.sh /lfs-scripts/6.18-gcc-pass2.sh
 RUN /lfs-scripts/6.18-gcc-pass2.sh
 
-# 6.xx - Add httpie so the image has a way to download files without
-# needing to install openssl (which requires installing perl....). Put
-# this into /httpie because it will still be used when we get to BLFS
-# packages.
-ARG HTTPIE_VERSION=3.4.0
-COPY scripts/6.xx-httpie.sh /lfs-scripts/6.xx-httpie.sh
-RUN /lfs-scripts/6.xx-httpie.sh
+# 6.xx - Add uv so the image has a way to download files without needing
+# to install openssl (which requires installing perl....). We'll use
+# this uv to install httpie in the chroot image.
+ARG UV_VERSION=0.8.3
+COPY scripts/6.xx-uv.sh /lfs-scripts/6.xx-uv.sh
+RUN /lfs-scripts/6.xx-uv.sh
 
 # 7.2 Clean up LFS - chown everything back to root, and delete /pass1.
 # Also create /tmp.
@@ -260,381 +259,385 @@ FROM scratch AS lfs-chroot
 
 COPY --from=lfs-build /mnt/lfs /
 
+
 # Now we want the /pass2 tools on the PATH, but put them last so that
 # we'll prefer to use the ones we're about to re-build into /usr. We
-# also want /httpie which only has the `download` script. Also add
-# /usr/sbin since several of these tools install there.
-ENV PATH=/bin:/usr/bin:/usr/sbin:/pass2/bin:/httpie/bin
-ENV LFS_TGT=x86_64-lfs-linux-gnu
+# also want /root/.local/bin which is where we're about to install
+# httpie. Also add /usr/sbin since several of these tools install there.
+ENV PATH=/bin:/usr/bin:/usr/sbin:/pass2/bin:/root/.local/bin
 ARG PARALLELISM=8
 ARG GNU_MIRROR=https://mirrors.ocf.berkeley.edu/gnu
 
 RUN mkdir /sources
 
-# 7.6 Create essential files
-COPY scripts/7.6-essential-files.sh /lfs-scripts/7.6-essential-files.sh
-RUN /lfs-scripts/7.6-essential-files.sh
-
-# 7.7 gettext
-ARG GETTEXT_VERSION=0.24
-COPY scripts/7.7-gettext.sh /lfs-scripts/7.7-gettext.sh
-RUN /lfs-scripts/7.7-gettext.sh
-
-# 7.8 Bison
-ARG BISON_VERSION=3.8.2
-COPY scripts/7.8-bison.sh /lfs-scripts/7.8-bison.sh
-RUN /lfs-scripts/7.8-bison.sh
-
-# 7.9 Perl
-ARG PERL_VERSION=5.40.1
-COPY scripts/7.9-perl.sh /lfs-scripts/7.9-perl.sh
-RUN /lfs-scripts/7.9-perl.sh
-
-# 8.5.1 install glibc - pass 3
-ARG GLIBC_VERSION=2.28
-ARG TZDATA_VERSION=2025a
-COPY scripts/8.5-glibc-pass3.sh /lfs-scripts/8.5-glibc-pass3.sh
-RUN /lfs-scripts/8.5-glibc-pass3.sh
-
-# 8.6 zlib
-ARG ZLIB_VERSION=1.3.1
-COPY scripts/8.6-zlib.sh /lfs-scripts/8.6-zlib.sh
-RUN /lfs-scripts/8.6-zlib.sh
-
-# 8.7 bzip2
-ARG BZIP2_VERSION=1.0.8
-COPY scripts/8.7-bzip2.sh /lfs-scripts/8.7-bzip2.sh
-RUN /lfs-scripts/8.7-bzip2.sh
-
-# 8.8 XZ
-ARG XZ_VERSION=5.6.4
-COPY scripts/8.8-xz.sh /lfs-scripts/8.8-xz.sh
-RUN /lfs-scripts/8.8-xz.sh
-
-# 8.9 LZ4
-ARG LZ4_VERSION=1.10.0
-COPY scripts/8.9-lz4.sh /lfs-scripts/8.9-lz4.sh
-RUN /lfs-scripts/8.9-lz4.sh
-
-# 8.10 zstd
-ARG ZSTD_VERSION=1.5.7
-COPY scripts/8.10-zstd.sh /lfs-scripts/8.10-zstd.sh
-RUN /lfs-scripts/8.10-zstd.sh
-
-# 8.11 File
-# Note: versions of file >= 5.38 use `sscanf()` to parse GUIDs, and this
-# fails with glibc 2.28 in this image. I spent hours tracking that down,
-# and more hours trying to find a workaround, but it seems like the
-# easiest thing is just to use an earlier version of file.
-ARG FILE_VERSION=5.38
-COPY scripts/8.11-file.sh /lfs-scripts/8.11-file.sh
-RUN /lfs-scripts/8.11-file.sh
-
-# 8.12 readline
-ARG READLINE_VERSION=8.2.13
-COPY scripts/8.12-readline.sh /lfs-scripts/8.12-readline.sh
-RUN /lfs-scripts/8.12-readline.sh
-
-# 8.13 M4
-ARG M4_VERSION=1.4.19
-COPY scripts/8.13-m4.sh /lfs-scripts/8.13-m4.sh
-RUN /lfs-scripts/8.13-m4.sh
-
-# 8.15 flex
-ARG FLEX_VERSION=2.6.4
-COPY scripts/8.15-flex.sh /lfs-scripts/8.15-flex.sh
-RUN /lfs-scripts/8.15-flex.sh
-
-# 8.19 pkgconf
-ARG PKGCONF_VERSION=2.3.0
-COPY scripts/8.19-pkgconf.sh /lfs-scripts/8.19-pkgconf.sh
-RUN /lfs-scripts/8.19-pkgconf.sh
-
-# 8.20 Binutils - pass 3
-ARG BINUTILS_VERSION=2.44
-COPY scripts/8.20-binutils-pass3.sh /lfs-scripts/8.20-binutils-pass3.sh
-RUN /lfs-scripts/8.20-binutils-pass3.sh
-
-# 8.24 Attributes
-ARG ATTR_VERSION=2.5.2
-COPY scripts/8.24-attr.sh /lfs-scripts/8.24-attr.sh
-RUN /lfs-scripts/8.24-attr.sh
-
-# 8.27 libxcrypt
-ARG LIBXCRYPT_VERSION=4.4.38
-COPY scripts/8.27-libxcrypt.sh /lfs-scripts/8.27-libxcrypt.sh
-RUN /lfs-scripts/8.27-libxcrypt.sh
-
-# 8.28 shadow
-ARG SHADOW_VERSION=4.17.3
-COPY scripts/8.28-shadow.sh /lfs-scripts/8.28-shadow.sh
-RUN /lfs-scripts/8.28-shadow.sh
-
-# 8.29 GCC - pass 3
-# Note: LFS builds GMP, MPRF, and MPC separately, installing them into
-# /usr. Since we're installing gcc into /opt and may want to have
-# several versions of gcc installed, we integrate the build for those
-# libraries into the gcc build script.
-ARG GMP_VERSION=6.2.1
-ARG MPFR_VERSION=4.1.0
-ARG MPC_VERSION=1.2.1
-ARG GCC_VERSION=13.2.0
-COPY scripts/8.29-gcc-pass3.sh /lfs-scripts/8.29-gcc-pass3.sh
-RUN /lfs-scripts/8.29-gcc-pass3.sh
-
-# 8.30 Ncurses
-ARG NCURSES_VERSION=6.5
-COPY scripts/8.30-ncurses.sh /lfs-scripts/8.30-ncurses.sh
-RUN /lfs-scripts/8.30-ncurses.sh
-
-# 8.31 sed
-ARG SED_VERSION=4.9
-COPY scripts/8.31-sed.sh /lfs-scripts/8.31-sed.sh
-RUN /lfs-scripts/8.31-sed.sh
-
-# 8.32 psmisc
-ARG PSMISC_VERSION=23.7
-COPY scripts/8.32-psmisc.sh /lfs-scripts/8.32-psmisc.sh
-RUN /lfs-scripts/8.32-psmisc.sh
-
-# 8.35 grep
-ARG GREP_VERSION=3.11
-COPY scripts/8.35-grep.sh /lfs-scripts/8.35-grep.sh
-RUN /lfs-scripts/8.35-grep.sh
-
-# 8.36 Bash
-# Use BASH_SHELL_VERSION since BASH_VERSION is a built-in variable in bash
-ARG BASH_SHELL_VERSION=5.2.37
-COPY scripts/8.36-bash.sh /lfs-scripts/8.36-bash.sh
-RUN /lfs-scripts/8.36-bash.sh
-
-# Now we can fix up this shell script from glibc to use the new bash
-RUN sed -i -e 's/pass2/usr/' /usr/bin/ldd
-
-# 8.37 libtool
-ARG LIBTOOL_VERSION=2.5.4
-COPY scripts/8.37-libtool.sh /lfs-scripts/8.37-libtool.sh
-RUN /lfs-scripts/8.37-libtool.sh
-
-# 8.42 Less
-ARG LESS_VERSION=668
-COPY scripts/8.42-less.sh /lfs-scripts/8.42-less.sh
-RUN /lfs-scripts/8.42-less.sh
-
-# 8.46 Autoconf
-ARG AUTOCONF_VERSION=2.72
-COPY scripts/8.46-autoconf.sh /lfs-scripts/8.46-autoconf.sh
-RUN /lfs-scripts/8.46-autoconf.sh
-
-# 8.47 Automake
-ARG AUTOMAKE_VERSION=1.17
-COPY scripts/8.47-automake.sh /lfs-scripts/8.47-automake.sh
-RUN /lfs-scripts/8.47-automake.sh
-
-# 8.48 OpenSSL
-ARG OPENSSL_VERSION=3.4.1
-COPY scripts/8.48-openssl.sh /lfs-scripts/8.48-openssl.sh
-RUN /lfs-scripts/8.48-openssl.sh
-
-# 8.49 Libelf
-ARG LIBELF_VERSION=0.188
-COPY scripts/8.49-libelf.sh /lfs-scripts/8.49-libelf.sh
-RUN /lfs-scripts/8.49-libelf.sh
-
-# 8.50 libffi
-ARG LIBFFI_VERSION=3.4.2
-COPY scripts/8.50-libffi.sh /lfs-scripts/8.50-libffi.sh
-RUN /lfs-scripts/8.50-libffi.sh
-
-# 8.55 - note that we install Ninja later in the BLFS section.
-
-# 8.58 coreutils
-ARG COREUTILS_VERSION=9.6
-COPY scripts/8.58-coreutils.sh /lfs-scripts/8.58-coreutils.sh
-RUN /lfs-scripts/8.58-coreutils.sh
-
-# 8.60 diffutils
-ARG DIFFUTILS_VERSION=3.11
-COPY scripts/8.60-diffutils.sh /lfs-scripts/8.60-diffutils.sh
-RUN /lfs-scripts/8.60-diffutils.sh
-
-# 8.61 gawk
-ARG GAWK_VERSION=5.3.1
-COPY scripts/8.61-gawk.sh /lfs-scripts/8.61-gawk.sh
-RUN /lfs-scripts/8.61-gawk.sh
-
-# 8.62 findutils
-ARG FINDUTILS_VERSION=4.10.0
-COPY scripts/8.62-findutils.sh /lfs-scripts/8.62-findutils.sh
-RUN /lfs-scripts/8.62-findutils.sh
-
-# 8.65 gzip
-ARG GZIP_VERSION=1.13
-COPY scripts/8.65-gzip.sh /lfs-scripts/8.65-gzip.sh
-RUN /lfs-scripts/8.65-gzip.sh
-
-# 8.69 make
-# Now we build make 4.4.1, rather than the earlier version we needed due
-# to glibc.
-ARG MAKE_VERSION=4.4.1
-COPY scripts/8.69-make.sh /lfs-scripts/8.69-make.sh
-RUN /lfs-scripts/8.69-make.sh
-
-# 8.70 patch
-ARG PATCH_VERSION=2.7.6
-COPY scripts/8.70-patch.sh /lfs-scripts/8.70-patch.sh
-RUN /lfs-scripts/8.70-patch.sh
-
-# 8.71 tar
-ARG TAR_VERSION=1.35
-COPY scripts/8.71-tar.sh /lfs-scripts/8.71-tar.sh
-RUN /lfs-scripts/8.71-tar.sh
-
-# 8.78 procps-ng
-ARG PROCPS_VERSION=4.0.5
-COPY scripts/8.78-procps.sh /lfs-scripts/8.78-procps.sh
-RUN /lfs-scripts/8.78-procps.sh
-
-# 8.79 util-linux
-ARG UTIL_LINUX_VERSION=2.40.4
-COPY scripts/8.79-util-linux.sh /lfs-scripts/8.79-util-linux.sh
-RUN /lfs-scripts/8.79-util-linux.sh
-
-# Various cleanups and fixups
-COPY scripts/8.xx-cleanup.sh /lfs-scripts/8.xx-cleanup.sh
-RUN /lfs-scripts/8.xx-cleanup.sh
-
-# 8.84 Strip everything
-COPY scripts/8.84-stripping.sh /lfs-scripts/8.84-stripping.sh
-RUN /lfs-scripts/8.84-stripping.sh
-
-RUN rm -rf /lfs-scripts
-
-FROM scratch AS blfs-stage1
-
-#
-# PASS 4: Build BLFS packages.
-#
-
-COPY --from=lfs-chroot / /
-ENV PATH=/opt/gcc-13.2.0/bin:/usr/bin:/usr/sbin:/httpie/bin
-ARG GNU_MIRROR=https://mirrors.ocf.berkeley.edu/gnu
-ARG PARALLELISM=8
-
-RUN mkdir /sources
-
-# All we *really* want here is curl and git. However, curl requires
-# libpsl, and libpsl in turn requires libidn2 and libunistring. So start
-# by installing those.
-
-# libunistring
-ARG LIBUNISTRING_VERSION=1.3
-COPY scripts/blfs-libunistring.sh /lfs-scripts/blfs-libunistring.sh
-RUN /lfs-scripts/blfs-libunistring.sh
-
-# libidn2
-ARG LIBIDN2_VERSION=2.3.8
-COPY scripts/blfs-libidn2.sh /lfs-scripts/blfs-libidn2.sh
-RUN /lfs-scripts/blfs-libidn2.sh
-
-# libpsl requires ninja to build. We're OK with this in the final image,
-# although we install it from a binary download which in turn requires
-# 7zip. Guess it's fine to have that in the final image too.
-
-# 7zip (from binary package)
-ARG SEVENZIP_VERSION=25.00
-COPY scripts/blfs-7zip.sh /lfs-scripts/blfs-7zip.sh
-RUN /lfs-scripts/blfs-7zip.sh
-
-# ninja (from binary package)
-ARG NINJA_VERSION=1.13.1
-COPY scripts/blfs-ninja.sh /lfs-scripts/blfs-ninja.sh
-RUN /lfs-scripts/blfs-ninja.sh
-
-# However, libpsl and p11-kit also requires meson to build, which we
-# DON'T want in the final image. We will install it temporarily using
-# our good friend UV. UV will put everything (including itself) under
-# /root/.local and /root/.cache. We will prune these afterwards.
-ARG MESON_VERSION=1.7.0
-ARG UV_VERSION=0.8.0
-COPY scripts/blfs-meson-temp.sh /lfs-scripts/blfs-meson-temp.sh
-RUN /lfs-scripts/blfs-meson-temp.sh
-
-# libpsl
-ARG LIBPSL_VERSION=0.21.5
-COPY scripts/blfs-libpsl.sh /lfs-scripts/blfs-libpsl.sh
-RUN /lfs-scripts/blfs-libpsl.sh
-
-# Also, before we build curl, we need to install the CA certificates.
-# LFS offers a useful tool to do the complex machinations for this,
-# called make-ca. However, we don't need this tool in the final image.
-# Also, make-ca requires p11-kit, which we'd prefer not to install in
-# the final image. Unfortunately, make-ca really can't do its job
-# without being installed globally. So, we're about to take a little
-# side trip where we install p11-kit and make-ca into a temporary image,
-# and then jump back to this image and just copy /etc/pki and /etc/ssl
-# from the temporary image.
-
-# First, though, p11-kit requires libtasn1, which we may as well have in
-# the final image.
-ARG LIBTASN1_VERSION=4.20.0
-COPY scripts/blfs-libtasn1.sh /lfs-scripts/blfs-libtasn1.sh
-RUN /lfs-scripts/blfs-libtasn1.sh
-
-FROM blfs-stage1 AS blfs-make-ca
-
-# make-ca, which also builds p11-kit
-ARG MAKE_CA_VERSION=1.16.1
-ARG P11_KIT_VERSION=0.25.5
-COPY scripts/blfs-make-ca.sh /lfs-scripts/blfs-make-ca.sh
-RUN /lfs-scripts/blfs-make-ca.sh
-
-FROM blfs-stage1 AS blfs-stage2
-
-# Now we can copy the CA certificates from the temporary image.
-COPY --from=blfs-make-ca /etc/pki /etc/pki
-COPY --from=blfs-make-ca /etc/ssl /etc/ssl
-
-# At long last: curl!
-ARG CURL_VERSION=8.15.0
-COPY scripts/blfs-curl.sh /lfs-scripts/blfs-curl.sh
-RUN /lfs-scripts/blfs-curl.sh
-
-# Sudo
-ARG SUDO_VERSION=1.9.17p1
-COPY scripts/blfs-sudo.sh /lfs-scripts/blfs-sudo.sh
-RUN /lfs-scripts/blfs-sudo.sh
-
-# OpenSSH
-ARG OPENSSH_VERSION=10.0p1
-COPY scripts/blfs-openssh.sh /lfs-scripts/blfs-openssh.sh
-RUN /lfs-scripts/blfs-openssh.sh
-
-# Fake "which" from BLFS
-COPY scripts/which /usr/bin/which
-
-# Final strip. Re-use the script from step 8.84. Note: we do this before
-# compiling git, because git makes heavy use of hard-linked files -
-# stripping them after installation will break the hard links, consuming
-# far more disk space.
-COPY scripts/8.84-stripping.sh /lfs-scripts/8.84-stripping.sh
-RUN /lfs-scripts/8.84-stripping.sh
-
-# And finally, git.
-ARG GIT_VERSION=2.50.1
-COPY scripts/blfs-git.sh /lfs-scripts/blfs-git.sh
-RUN /lfs-scripts/blfs-git.sh
-
-# Final cleanup!
-COPY scripts/blfs-cleanup.sh /lfs-scripts/blfs-cleanup.sh
-RUN /lfs-scripts/blfs-cleanup.sh
-
-# Flatten the final image.
-
-FROM scratch AS docker-from-scratch
-COPY --from=blfs-stage2 / /
-
-RUN mkdir -pv /usr/local/bin
-ENV PATH=/opt/gcc-13.2.0/bin:/usr/bin:/usr/local/bin:/usr/sbin
-ENV LANG=en_US.UTF-8
-CMD ["bash"]
+# # 7.xx httpie
+# ARG HTTPIE_VERSION=3.2.4
+# COPY scripts/7.xx-httpie.sh /lfs-scripts/7.xx-httpie.sh
+# RUN /lfs-scripts/7.xx-httpie.sh
+
+# # 7.6 Create essential files
+# COPY scripts/7.6-essential-files.sh /lfs-scripts/7.6-essential-files.sh
+# RUN /lfs-scripts/7.6-essential-files.sh
+
+# # 7.7 gettext
+# ARG GETTEXT_VERSION=0.24
+# COPY scripts/7.7-gettext.sh /lfs-scripts/7.7-gettext.sh
+# RUN /lfs-scripts/7.7-gettext.sh
+
+# # 7.8 Bison
+# ARG BISON_VERSION=3.8.2
+# COPY scripts/7.8-bison.sh /lfs-scripts/7.8-bison.sh
+# RUN /lfs-scripts/7.8-bison.sh
+
+# # 7.9 Perl
+# ARG PERL_VERSION=5.40.1
+# COPY scripts/7.9-perl.sh /lfs-scripts/7.9-perl.sh
+# RUN /lfs-scripts/7.9-perl.sh
+
+# # 8.5.1 install glibc - pass 3
+# ARG GLIBC_VERSION=2.28
+# ARG TZDATA_VERSION=2025a
+# COPY scripts/8.5-glibc-pass3.sh /lfs-scripts/8.5-glibc-pass3.sh
+# RUN /lfs-scripts/8.5-glibc-pass3.sh
+
+# # 8.6 zlib
+# ARG ZLIB_VERSION=1.3.1
+# COPY scripts/8.6-zlib.sh /lfs-scripts/8.6-zlib.sh
+# RUN /lfs-scripts/8.6-zlib.sh
+
+# # 8.7 bzip2
+# ARG BZIP2_VERSION=1.0.8
+# COPY scripts/8.7-bzip2.sh /lfs-scripts/8.7-bzip2.sh
+# RUN /lfs-scripts/8.7-bzip2.sh
+
+# # 8.8 XZ
+# ARG XZ_VERSION=5.6.4
+# COPY scripts/8.8-xz.sh /lfs-scripts/8.8-xz.sh
+# RUN /lfs-scripts/8.8-xz.sh
+
+# # 8.9 LZ4
+# ARG LZ4_VERSION=1.10.0
+# COPY scripts/8.9-lz4.sh /lfs-scripts/8.9-lz4.sh
+# RUN /lfs-scripts/8.9-lz4.sh
+
+# # 8.10 zstd
+# ARG ZSTD_VERSION=1.5.7
+# COPY scripts/8.10-zstd.sh /lfs-scripts/8.10-zstd.sh
+# RUN /lfs-scripts/8.10-zstd.sh
+
+# # 8.11 File
+# # Note: versions of file >= 5.38 use `sscanf()` to parse GUIDs, and this
+# # fails with glibc 2.28 in this image. I spent hours tracking that down,
+# # and more hours trying to find a workaround, but it seems like the
+# # easiest thing is just to use an earlier version of file.
+# ARG FILE_VERSION=5.38
+# COPY scripts/8.11-file.sh /lfs-scripts/8.11-file.sh
+# RUN /lfs-scripts/8.11-file.sh
+
+# # 8.12 readline
+# ARG READLINE_VERSION=8.2.13
+# COPY scripts/8.12-readline.sh /lfs-scripts/8.12-readline.sh
+# RUN /lfs-scripts/8.12-readline.sh
+
+# # 8.13 M4
+# ARG M4_VERSION=1.4.19
+# COPY scripts/8.13-m4.sh /lfs-scripts/8.13-m4.sh
+# RUN /lfs-scripts/8.13-m4.sh
+
+# # 8.15 flex
+# ARG FLEX_VERSION=2.6.4
+# COPY scripts/8.15-flex.sh /lfs-scripts/8.15-flex.sh
+# RUN /lfs-scripts/8.15-flex.sh
+
+# # 8.19 pkgconf
+# ARG PKGCONF_VERSION=2.3.0
+# COPY scripts/8.19-pkgconf.sh /lfs-scripts/8.19-pkgconf.sh
+# RUN /lfs-scripts/8.19-pkgconf.sh
+
+# # 8.20 Binutils - pass 3
+# ARG BINUTILS_VERSION=2.44
+# COPY scripts/8.20-binutils-pass3.sh /lfs-scripts/8.20-binutils-pass3.sh
+# RUN /lfs-scripts/8.20-binutils-pass3.sh
+
+# # 8.24 Attributes
+# ARG ATTR_VERSION=2.5.2
+# COPY scripts/8.24-attr.sh /lfs-scripts/8.24-attr.sh
+# RUN /lfs-scripts/8.24-attr.sh
+
+# # 8.27 libxcrypt
+# ARG LIBXCRYPT_VERSION=4.4.38
+# COPY scripts/8.27-libxcrypt.sh /lfs-scripts/8.27-libxcrypt.sh
+# RUN /lfs-scripts/8.27-libxcrypt.sh
+
+# # 8.28 shadow
+# ARG SHADOW_VERSION=4.17.3
+# COPY scripts/8.28-shadow.sh /lfs-scripts/8.28-shadow.sh
+# RUN /lfs-scripts/8.28-shadow.sh
+
+# # 8.29 GCC - pass 3
+# # Note: LFS builds GMP, MPRF, and MPC separately, installing them into
+# # /usr. Since we're installing gcc into /opt and may want to have
+# # several versions of gcc installed, we integrate the build for those
+# # libraries into the gcc build script.
+# ARG GMP_VERSION=6.2.1
+# ARG MPFR_VERSION=4.1.0
+# ARG MPC_VERSION=1.2.1
+# ARG GCC_VERSION=13.2.0
+# COPY scripts/8.29-gcc-pass3.sh /lfs-scripts/8.29-gcc-pass3.sh
+# RUN /lfs-scripts/8.29-gcc-pass3.sh
+
+# # 8.30 Ncurses
+# ARG NCURSES_VERSION=6.5
+# COPY scripts/8.30-ncurses.sh /lfs-scripts/8.30-ncurses.sh
+# RUN /lfs-scripts/8.30-ncurses.sh
+
+# # 8.31 sed
+# ARG SED_VERSION=4.9
+# COPY scripts/8.31-sed.sh /lfs-scripts/8.31-sed.sh
+# RUN /lfs-scripts/8.31-sed.sh
+
+# # 8.32 psmisc
+# ARG PSMISC_VERSION=23.7
+# COPY scripts/8.32-psmisc.sh /lfs-scripts/8.32-psmisc.sh
+# RUN /lfs-scripts/8.32-psmisc.sh
+
+# # 8.35 grep
+# ARG GREP_VERSION=3.11
+# COPY scripts/8.35-grep.sh /lfs-scripts/8.35-grep.sh
+# RUN /lfs-scripts/8.35-grep.sh
+
+# # 8.36 Bash
+# # Use BASH_SHELL_VERSION since BASH_VERSION is a built-in variable in bash
+# ARG BASH_SHELL_VERSION=5.2.37
+# COPY scripts/8.36-bash.sh /lfs-scripts/8.36-bash.sh
+# RUN /lfs-scripts/8.36-bash.sh
+
+# # Now we can fix up this shell script from glibc to use the new bash
+# RUN sed -i -e 's/pass2/usr/' /usr/bin/ldd
+
+# # 8.37 libtool
+# ARG LIBTOOL_VERSION=2.5.4
+# COPY scripts/8.37-libtool.sh /lfs-scripts/8.37-libtool.sh
+# RUN /lfs-scripts/8.37-libtool.sh
+
+# # 8.42 Less
+# ARG LESS_VERSION=668
+# COPY scripts/8.42-less.sh /lfs-scripts/8.42-less.sh
+# RUN /lfs-scripts/8.42-less.sh
+
+# # 8.46 Autoconf
+# ARG AUTOCONF_VERSION=2.72
+# COPY scripts/8.46-autoconf.sh /lfs-scripts/8.46-autoconf.sh
+# RUN /lfs-scripts/8.46-autoconf.sh
+
+# # 8.47 Automake
+# ARG AUTOMAKE_VERSION=1.17
+# COPY scripts/8.47-automake.sh /lfs-scripts/8.47-automake.sh
+# RUN /lfs-scripts/8.47-automake.sh
+
+# # 8.48 OpenSSL
+# ARG OPENSSL_VERSION=3.4.1
+# COPY scripts/8.48-openssl.sh /lfs-scripts/8.48-openssl.sh
+# RUN /lfs-scripts/8.48-openssl.sh
+
+# # 8.49 Libelf
+# ARG LIBELF_VERSION=0.188
+# COPY scripts/8.49-libelf.sh /lfs-scripts/8.49-libelf.sh
+# RUN /lfs-scripts/8.49-libelf.sh
+
+# # 8.50 libffi
+# ARG LIBFFI_VERSION=3.4.2
+# COPY scripts/8.50-libffi.sh /lfs-scripts/8.50-libffi.sh
+# RUN /lfs-scripts/8.50-libffi.sh
+
+# # 8.55 - note that we install Ninja later in the BLFS section.
+
+# # 8.58 coreutils
+# ARG COREUTILS_VERSION=9.6
+# COPY scripts/8.58-coreutils.sh /lfs-scripts/8.58-coreutils.sh
+# RUN /lfs-scripts/8.58-coreutils.sh
+
+# # 8.60 diffutils
+# ARG DIFFUTILS_VERSION=3.11
+# COPY scripts/8.60-diffutils.sh /lfs-scripts/8.60-diffutils.sh
+# RUN /lfs-scripts/8.60-diffutils.sh
+
+# # 8.61 gawk
+# ARG GAWK_VERSION=5.3.1
+# COPY scripts/8.61-gawk.sh /lfs-scripts/8.61-gawk.sh
+# RUN /lfs-scripts/8.61-gawk.sh
+
+# # 8.62 findutils
+# ARG FINDUTILS_VERSION=4.10.0
+# COPY scripts/8.62-findutils.sh /lfs-scripts/8.62-findutils.sh
+# RUN /lfs-scripts/8.62-findutils.sh
+
+# # 8.65 gzip
+# ARG GZIP_VERSION=1.13
+# COPY scripts/8.65-gzip.sh /lfs-scripts/8.65-gzip.sh
+# RUN /lfs-scripts/8.65-gzip.sh
+
+# # 8.69 make
+# # Now we build make 4.4.1, rather than the earlier version we needed due
+# # to glibc.
+# ARG MAKE_VERSION=4.4.1
+# COPY scripts/8.69-make.sh /lfs-scripts/8.69-make.sh
+# RUN /lfs-scripts/8.69-make.sh
+
+# # 8.70 patch
+# ARG PATCH_VERSION=2.7.6
+# COPY scripts/8.70-patch.sh /lfs-scripts/8.70-patch.sh
+# RUN /lfs-scripts/8.70-patch.sh
+
+# # 8.71 tar
+# ARG TAR_VERSION=1.35
+# COPY scripts/8.71-tar.sh /lfs-scripts/8.71-tar.sh
+# RUN /lfs-scripts/8.71-tar.sh
+
+# # 8.78 procps-ng
+# ARG PROCPS_VERSION=4.0.5
+# COPY scripts/8.78-procps.sh /lfs-scripts/8.78-procps.sh
+# RUN /lfs-scripts/8.78-procps.sh
+
+# # 8.79 util-linux
+# ARG UTIL_LINUX_VERSION=2.40.4
+# COPY scripts/8.79-util-linux.sh /lfs-scripts/8.79-util-linux.sh
+# RUN /lfs-scripts/8.79-util-linux.sh
+
+# # Various cleanups and fixups
+# COPY scripts/8.xx-cleanup.sh /lfs-scripts/8.xx-cleanup.sh
+# RUN /lfs-scripts/8.xx-cleanup.sh
+
+# # 8.84 Strip everything
+# COPY scripts/8.84-stripping.sh /lfs-scripts/8.84-stripping.sh
+# RUN /lfs-scripts/8.84-stripping.sh
+
+# RUN rm -rf /lfs-scripts
+
+# FROM scratch AS blfs-stage1
+
+# #
+# # PASS 4: Build BLFS packages.
+# #
+
+# COPY --from=lfs-chroot / /
+# ENV PATH=/opt/gcc-13.2.0/bin:/usr/bin:/usr/sbin:/root/.local/bin
+# ARG GNU_MIRROR=https://mirrors.ocf.berkeley.edu/gnu
+# ARG PARALLELISM=8
+
+# RUN mkdir /sources
+
+# # All we *really* want here is curl and git. However, curl requires
+# # libpsl, and libpsl in turn requires libidn2 and libunistring. So start
+# # by installing those.
+
+# # libunistring
+# ARG LIBUNISTRING_VERSION=1.3
+# COPY scripts/blfs-libunistring.sh /lfs-scripts/blfs-libunistring.sh
+# RUN /lfs-scripts/blfs-libunistring.sh
+
+# # libidn2
+# ARG LIBIDN2_VERSION=2.3.8
+# COPY scripts/blfs-libidn2.sh /lfs-scripts/blfs-libidn2.sh
+# RUN /lfs-scripts/blfs-libidn2.sh
+
+# # libpsl requires ninja to build. We're OK with this in the final image,
+# # although we install it from a binary download which in turn requires
+# # 7zip. Guess it's fine to have that in the final image too.
+
+# # 7zip (from binary package)
+# ARG SEVENZIP_VERSION=25.00
+# COPY scripts/blfs-7zip.sh /lfs-scripts/blfs-7zip.sh
+# RUN /lfs-scripts/blfs-7zip.sh
+
+# # ninja (from binary package)
+# ARG NINJA_VERSION=1.13.1
+# COPY scripts/blfs-ninja.sh /lfs-scripts/blfs-ninja.sh
+# RUN /lfs-scripts/blfs-ninja.sh
+
+# # However, libpsl and p11-kit also requires meson to build, which we
+# # DON'T want in the final image. We will install it temporarily using
+# # our good friend UV. UV will put everything (including itself) under
+# # /root/.local and /root/.cache. We will prune these afterwards.
+# ARG MESON_VERSION=1.7.0
+# COPY scripts/blfs-meson-temp.sh /lfs-scripts/blfs-meson-temp.sh
+# RUN /lfs-scripts/blfs-meson-temp.sh
+
+# # libpsl
+# ARG LIBPSL_VERSION=0.21.5
+# COPY scripts/blfs-libpsl.sh /lfs-scripts/blfs-libpsl.sh
+# RUN /lfs-scripts/blfs-libpsl.sh
+
+# # Also, before we build curl, we need to install the CA certificates.
+# # LFS offers a useful tool to do the complex machinations for this,
+# # called make-ca. However, we don't need this tool in the final image.
+# # Also, make-ca requires p11-kit, which we'd prefer not to install in
+# # the final image. Unfortunately, make-ca really can't do its job
+# # without being installed globally. So, we're about to take a little
+# # side trip where we install p11-kit and make-ca into a temporary image,
+# # and then jump back to this image and just copy /etc/pki and /etc/ssl
+# # from the temporary image.
+
+# # First, though, p11-kit requires libtasn1, which we may as well have in
+# # the final image.
+# ARG LIBTASN1_VERSION=4.20.0
+# COPY scripts/blfs-libtasn1.sh /lfs-scripts/blfs-libtasn1.sh
+# RUN /lfs-scripts/blfs-libtasn1.sh
+
+# FROM blfs-stage1 AS blfs-make-ca
+
+# # make-ca, which also builds p11-kit
+# ARG MAKE_CA_VERSION=1.16.1
+# ARG P11_KIT_VERSION=0.25.5
+# COPY scripts/blfs-make-ca.sh /lfs-scripts/blfs-make-ca.sh
+# RUN /lfs-scripts/blfs-make-ca.sh
+
+# FROM blfs-stage1 AS blfs-stage2
+
+# # Now we can copy the CA certificates from the temporary image.
+# COPY --from=blfs-make-ca /etc/pki /etc/pki
+# COPY --from=blfs-make-ca /etc/ssl /etc/ssl
+
+# # At long last: curl!
+# ARG CURL_VERSION=8.15.0
+# COPY scripts/blfs-curl.sh /lfs-scripts/blfs-curl.sh
+# RUN /lfs-scripts/blfs-curl.sh
+
+# # Sudo
+# ARG SUDO_VERSION=1.9.17p1
+# COPY scripts/blfs-sudo.sh /lfs-scripts/blfs-sudo.sh
+# RUN /lfs-scripts/blfs-sudo.sh
+
+# # OpenSSH
+# ARG OPENSSH_VERSION=10.0p1
+# COPY scripts/blfs-openssh.sh /lfs-scripts/blfs-openssh.sh
+# RUN /lfs-scripts/blfs-openssh.sh
+
+# # Fake "which" from BLFS
+# COPY scripts/which /usr/bin/which
+
+# # Final strip. Re-use the script from step 8.84. Note: we do this before
+# # compiling git, because git makes heavy use of hard-linked files -
+# # stripping them after installation will break the hard links, consuming
+# # far more disk space.
+# COPY scripts/8.84-stripping.sh /lfs-scripts/8.84-stripping.sh
+# RUN /lfs-scripts/8.84-stripping.sh
+
+# # And finally, git.
+# ARG GIT_VERSION=2.50.1
+# COPY scripts/blfs-git.sh /lfs-scripts/blfs-git.sh
+# RUN /lfs-scripts/blfs-git.sh
+
+# # Final cleanup!
+# COPY scripts/blfs-cleanup.sh /lfs-scripts/blfs-cleanup.sh
+# RUN /lfs-scripts/blfs-cleanup.sh
+
+# # Flatten the final image.
+
+# FROM scratch AS docker-from-scratch
+# COPY --from=blfs-stage2 / /
+
+# RUN mkdir -pv /usr/local/bin
+# ENV PATH=/opt/gcc-13.2.0/bin:/usr/bin:/usr/local/bin:/usr/sbin
+# ENV LANG=en_US.UTF-8
+# CMD ["bash"]

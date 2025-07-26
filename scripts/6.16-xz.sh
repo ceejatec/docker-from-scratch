@@ -1,5 +1,7 @@
 #!/bin/bash -ex
 
+export LFS_TGT=$(uname -m)-lfs-linux-gnu
+
 cd $LFS_SRC
 curl -LO https://github.com/tukaani-project/xz/releases/download/v${XZ_VERSION}/xz-${XZ_VERSION}.tar.xz
 tar -xf xz-${XZ_VERSION}.tar.xz

@@ -1,5 +1,7 @@
 #!/bin/bash -ex
 
+export LFS_TGT=$(uname -m)-lfs-linux-gnu
+
 cd $LFS_SRC
 curl -LO ${GNU_MIRROR}/glibc/glibc-${GLIBC_VERSION}.tar.xz
 tar -xf glibc-${GLIBC_VERSION}.tar.xz

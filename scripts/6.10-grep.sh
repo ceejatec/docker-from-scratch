@@ -1,5 +1,7 @@
 #!/bin/bash -ex
 
+export LFS_TGT=$(uname -m)-lfs-linux-gnu
+
 cd $LFS_SRC
 curl -LO ${GNU_MIRROR}/grep/grep-${GREP_VERSION}.tar.xz
 tar -xf grep-${GREP_VERSION}.tar.xz

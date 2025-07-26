@@ -1,5 +1,7 @@
 #!/bin/bash -ex
 
+export LFS_TGT=$(uname -m)-lfs-linux-gnu
+
 cd $LFS_SRC
 curl -LO https://astron.com/pub/file/file-${FILE_VERSION}.tar.gz
 tar -xf file-${FILE_VERSION}.tar.gz

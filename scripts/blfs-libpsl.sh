@@ -10,7 +10,7 @@ cd build
 
 # Reminder that meson is installed temporarily in /root/.local/bin and
 # won't be in the final image
-export PATH=${PATH}:${HOME}/.local/bin
+export PATH=${PATH}:/root/.local/bin
 meson setup --prefix=/usr --buildtype=release
 ninja
 ninja install

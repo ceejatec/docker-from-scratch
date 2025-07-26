@@ -1,5 +1,7 @@
 #!/bin/bash -ex
 
+export LFS_TGT=$(uname -m)-lfs-linux-gnu
+
 cd $LFS_SRC
 curl -LO ${GNU_MIRROR}/patch/patch-${PATCH_VERSION}.tar.gz
 tar -xf patch-${PATCH_VERSION}.tar.gz

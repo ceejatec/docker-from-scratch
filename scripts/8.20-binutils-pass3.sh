@@ -1,7 +1,7 @@
 #!/bin/bash -ex
 
 cd /tmp
-download https://sourceware.org/pub/binutils/releases/binutils-${BINUTILS_VERSION}.tar.xz
+download ${GNU_MIRROR}/binutils/binutils-${BINUTILS_VERSION}.tar.xz
 tar -xf binutils-${BINUTILS_VERSION}.tar.xz
 cd binutils-${BINUTILS_VERSION}
 

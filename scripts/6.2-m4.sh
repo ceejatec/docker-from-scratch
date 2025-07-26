@@ -1,5 +1,7 @@
 #!/bin/bash -ex
 
+export LFS_TGT=$(uname -m)-lfs-linux-gnu
+
 cd $LFS_SRC
 curl -LO ${GNU_MIRROR}/m4/m4-${M4_VERSION}.tar.xz
 tar -xf m4-${M4_VERSION}.tar.xz

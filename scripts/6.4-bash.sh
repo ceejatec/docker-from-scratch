@@ -1,5 +1,7 @@
 #!/bin/bash -ex
 
+export LFS_TGT=$(uname -m)-lfs-linux-gnu
+
 cd $LFS_SRC
 curl -LO ${GNU_MIRROR}/bash/bash-${BASH_SHELL_VERSION}.tar.gz
 tar -xf bash-${BASH_SHELL_VERSION}.tar.gz

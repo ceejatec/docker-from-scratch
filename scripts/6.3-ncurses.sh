@@ -1,5 +1,7 @@
 #!/bin/bash -ex
 
+export LFS_TGT=$(uname -m)-lfs-linux-gnu
+
 cd $LFS_SRC
 curl -LO ${GNU_MIRROR}/ncurses/ncurses-${NCURSES_VERSION}.tar.gz
 tar -xf ncurses-${NCURSES_VERSION}.tar.gz
