@@ -1,15 +1,23 @@
 #!/bin/bash -ex
 
 cd /tmp
-download ${GNU_MIRROR}/binutils/binutils-${BINUTILS_VERSION}.tar.xz
-tar -xf binutils-${BINUTILS_VERSION}.tar.xz
-cd binutils-${BINUTILS_VERSION}
+# Note: we need --enable-gold on aarch64, because Golang still requires
+# gold. For consistency, we build it regardless of platform.
+# --enable-ld=default ensures that ld.bfd is used unless gold is
+# specifically requested. This may need to be revisited as gold is
+# deprecated starting in binutils 2.44 (hence the separate
+# "binutils-with-gold" tarball).
+# https://github.com/golang/go/issues/22040
+download ${GNU_MIRROR}/binutils/binutils-with-gold-${BINUTILS_VERSION}.tar.xz
+tar -xf binutils-with-gold-${BINUTILS_VERSION}.tar.xz
+cd binutils-with-gold-${BINUTILS_VERSION}
 
 mkdir build
 cd build
 ../configure --prefix=/usr       \
              --sysconfdir=/etc   \
              --enable-ld=default \
+             --enable-gold       \
              --enable-plugins    \
              --enable-shared     \
              --disable-werror    \

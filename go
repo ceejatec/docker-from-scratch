@@ -4,12 +4,28 @@ IMAGE=couchbasebuild/dfs
 TAG=$(date +%Y%m%d)
 
 PUBLISH=false
-PLATFORMS=
+case "$(uname -m)" in
+  x86_64)
+    PLATFORM=linux/amd64
+    ;;
+  aarch64)
+    PLATFORM=linux/arm64
+    ;;
+  *)
+    echo "Unsupported architecture: $(uname -m)"
+    exit 1
+    ;;
+esac
 for arg in "$@"; do
   case "${arg}" in
     --publish)
       PUBLISH=true
-      PLATFORMS=linux/arm64,linux/amd64
+      ;;
+    --aarch64)
+      PLATFORM=linux/arm64
+      ;;
+    --x86_64)
+      PLATFORM=linux/amd64
       ;;
     *)
       echo "Invalid flag: ${arg}"
@@ -20,13 +36,14 @@ done
 
 if ${PUBLISH}; then
   ACTION=--push
-  PLATFORMS="--platforms linux/arm64,linux/arm64"
+  PLATFORM="linux/amd64,linux/arm64"
 else
   ACTION=--load
   # If we're not publishing, we only build for the current architecture.
 fi
 
-docker buildx build ${ACTION} ${PLATFORMS} \
+set -x
+docker buildx build ${ACTION} --platform ${PLATFORM} \
   -t couchbasebuild/dfs:${TAG} \
   -t couchbasebuild/dfs:latest \
   .
